@@ -1,0 +1,10 @@
+#include "assignment3qt.h"
+#include <QtWidgets/QApplication>
+
+int main(int argc, char *argv[])
+{
+	QApplication a(argc, argv);
+	Assignment3Qt w;
+	w.show();
+	return a.exec();
+}

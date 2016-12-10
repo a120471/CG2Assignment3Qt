@@ -1,0 +1,11 @@
+# Sphere; center; radius; color
+Sphere; 0.0, 0.0, 0.0; 1.0; 1.0, 1.0, 1.0
+
+# Plane; ABCD; color
+Plane; 0, 1, 0, 1.5; 1, 1, 1
+
+# Model; filePath; color
+# Model; ../dragon.obj; 0.5, 0.5, 0.5
+# Model; ../bunny.obj; 0.5, 0.5, 0.5
+# Model; ../ico2.ply; 0.5, 0.5, 0.5
+# Model; ../1.obj; 0.5, 0.5, 0.5
