@@ -190,10 +190,10 @@ void SquareMap::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 		float wh1 = hCoord - floor(hCoord);
 		float wh2 = 1.0f - wh1;
 		
-		glm::vec3 color = data[(int)hCoord][(int)wCoord] * ww1 * wh1 +
-			data[(int)hCoord][(int)wCoord + 1] * ww2 * wh1 +
-			data[(int)hCoord + 1][(int)wCoord] * ww1 * wh2 +
-			data[(int)hCoord + 1][(int)wCoord + 1] * ww2 * wh2;
+		glm::vec3 color = data[(int)hCoord][(int)wCoord] * ww2 * wh2 +
+			data[(int)hCoord][(int)wCoord + 1] * ww1 * wh2 +
+			data[(int)hCoord + 1][(int)wCoord] * ww2 * wh1 +
+			data[(int)hCoord + 1][(int)wCoord + 1] * ww1 * wh1;
 
 		rhor.pointColor = color;
 		rhor.depth = t;
