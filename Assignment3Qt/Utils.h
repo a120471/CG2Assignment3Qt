@@ -5,26 +5,29 @@
 #include "rayTracingCamera.h"
 #include <ctime>
 
-#ifndef INFINITE
-#define INFINITE 999999
-#endif // !INFINITE
+#ifndef MYINFINITE
+#define MYINFINITE 999999
+#endif // !MYINFINITE
 
-#ifndef EPSILON
-#define EPSILON 2e-4
-#endif // !EPSILON
+#ifndef MYEPSILON
+#define MYEPSILON 2e-4
+#endif // !MYEPSILON
 
 #ifndef COLORINTENSITYTHRES
 #define COLORINTENSITYTHRES 4e4f
 #endif // !COLORINTENSITYTHRES
 
-#ifndef UNITCOLORINTENSITY
-#define UNITCOLORINTENSITY (COLORINTENSITYTHRES / 10.0f)
-#endif // !UNITCOLORINTENSITY
+#ifndef UNITAREASAMPLECOLOR
+#define UNITAREASAMPLECOLOR (COLORINTENSITYTHRES / 10.0f)
+#endif // !UNITAREASAMPLECOLOR
 
 #ifndef NTHIDX
 #define NTHIDX 85 / 100
 #endif // !NTHIDX
 
+#ifndef MYTHREADNUM
+#define MYTHREADNUM 16
+#endif // !MYTHREADNUM
 
 template<typename T> void safe_delete(T*& a)
 {
@@ -60,16 +63,16 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 	glm::vec3 A_RS = A - ray->sPoint;
 	glm::vec3 B_RS = B - ray->sPoint;
 
-	if (dx < EPSILON && (A_RS.x > EPSILON || B_RS.x < -EPSILON))
+	if (dx < MYEPSILON && (A_RS.x > MYEPSILON || B_RS.x < -MYEPSILON))
 		return false;
-	if (dy < EPSILON && (A_RS.y > EPSILON || B_RS.y < -EPSILON))
+	if (dy < MYEPSILON && (A_RS.y > MYEPSILON || B_RS.y < -MYEPSILON))
 		return false;
-	if (dz < EPSILON && (A_RS.z > EPSILON || B_RS.z < -EPSILON))
+	if (dz < MYEPSILON && (A_RS.z > MYEPSILON || B_RS.z < -MYEPSILON))
 		return false;
 	
-	float maxTMin = -INFINITE, minTMax = INFINITE, maxTMax = -INFINITE;
+	float maxTMin = -MYINFINITE, minTMax = MYINFINITE, maxTMax = -MYINFINITE;
 	
-	if (dx > EPSILON) 
+	if (dx > MYEPSILON)
 	{
 		float t1 = A_RS.x / ray->direction.x;
 		float t2 = B_RS.x / ray->direction.x;
@@ -80,7 +83,7 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 		if (minTMax > t2) minTMax = t2;
 		if (maxTMax < t2) maxTMax = t2;
 	}	
-	if (dy > EPSILON)
+	if (dy > MYEPSILON)
 	{
 		float t1 = A_RS.y / ray->direction.y;
 		float t2 = B_RS.y / ray->direction.y;
@@ -91,7 +94,7 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 		if (minTMax > t2) minTMax = t2;
 		if (maxTMax < t2) maxTMax = t2;
 	}
-	if (dz > EPSILON)
+	if (dz > MYEPSILON)
 	{
 		float t1 = A_RS.z / ray->direction.z;
 		float t2 = B_RS.z / ray->direction.z;
@@ -103,7 +106,7 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 		if (maxTMax < t2) maxTMax = t2;
 	}
 
-	if (maxTMin < minTMax + EPSILON && maxTMax > EPSILON)
+	if (maxTMin < minTMax + MYEPSILON && maxTMax > MYEPSILON)
 		return true;
 	else
 		return false;

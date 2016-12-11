@@ -31,15 +31,18 @@ public:
 
 	void RenderImage(const QTInputParam&, vector<GeometryObject*> &scene, RayTracingCameraClass* camera, vector<LightBase*> &light);
 
-	int RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vector<LightBase*> &light, RayHitObjectRecord &record, float lightDis = INFINITE);
+	int RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vector<LightBase*> &light, RayHitObjectRecord &record, float lightDis = MYINFINITE);
 
 	glm::vec3 calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level);
 
 private:
+	Ui::Assignment3QtClass ui;
+
 	// scene is loaded from text, so we need to deal with the line data
 	void processSceneData(vector<GeometryObject*> &scene, QString line);
-
-	Ui::Assignment3QtClass ui;
+	
+	void RenderPixels(RayTracingCameraClass* camera, int row, int start, int end, vector<glm::vec3> &pixelList,
+		vector<GeometryObject*> &scene, vector<LightBase*> &light);
 
 private slots:
 // choose the scene data path

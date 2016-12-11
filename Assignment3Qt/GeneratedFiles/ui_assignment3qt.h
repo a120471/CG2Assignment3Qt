@@ -203,13 +203,13 @@ public:
     {
         Assignment3QtClass->setWindowTitle(QApplication::translate("Assignment3QtClass", "Assignment3Qt", 0));
         label_RW->setText(QApplication::translate("Assignment3QtClass", "ResolutionW", 0));
-        resolutionW->setText(QApplication::translate("Assignment3QtClass", "200", 0));
+        resolutionW->setText(QApplication::translate("Assignment3QtClass", "400", 0));
         label_RH->setText(QApplication::translate("Assignment3QtClass", "ResolutionH", 0));
-        resolutionH->setText(QApplication::translate("Assignment3QtClass", "150", 0));
+        resolutionH->setText(QApplication::translate("Assignment3QtClass", "300", 0));
         label_AA->setText(QApplication::translate("Assignment3QtClass", "AntiAliasing", 0));
         antiAliasing->setText(QApplication::translate("Assignment3QtClass", "1", 0));
         label_ICR->setText(QApplication::translate("Assignment3QtClass", "ImageScale", 0));
-        imageScaleRatio->setText(QApplication::translate("Assignment3QtClass", "6", 0));
+        imageScaleRatio->setText(QApplication::translate("Assignment3QtClass", "3", 0));
         label_CP->setText(QApplication::translate("Assignment3QtClass", "CameraPos", 0));
         CameraPos->setText(QApplication::translate("Assignment3QtClass", "0.0, 1.0, 6.0", 0));
         label_LA->setText(QApplication::translate("Assignment3QtClass", "LookAt", 0));

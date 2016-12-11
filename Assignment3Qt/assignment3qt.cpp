@@ -1,5 +1,6 @@
 #include "assignment3qt.h"
 
+#include <thread>
 #include <omp.h>
 #include <algorithm>
 #include <ctime>
@@ -23,7 +24,9 @@ Assignment3Qt::Assignment3Qt(QWidget *parent)
 	//QObject::connect(ui.pushButton_Render, SIGNAL(clicked()),
 	//	this, SLOT(on_pushButton_Render_clicked()));
 
-	//on_pushButton_Render_clicked();
+	this->show();
+	QCoreApplication::processEvents();
+	on_pushButton_Render_clicked();
 }
 
 // choose the scene data path
@@ -46,13 +49,13 @@ void Assignment3Qt::on_pushButton_Browse_clicked()
 // begin to render
 void Assignment3Qt::on_pushButton_Render_clicked()
 {
-	// ALL COLORS ARE stored in BGR CHANNELS
+	// ALL COLORS ARE stored in RGB CHANNELS
 
 	// create light
 	vector<LightBase*> light;
 	//light.push_back((LightBase*)new PointLight(glm::vec3(1.3, -1.3, -1.3), glm::vec3(1, 1, 1) * 0.7f));
-	//light.push_back((LightBase*)new PointLight(glm::vec3(0.8, -0.5, 3.3), glm::vec3(0.5, 0.6, 0.4) * 1.0f));
-	light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 2.1f));
+	//light.push_back((LightBase*)new PointLight(glm::vec3(0.8, -0.5, 3.3), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
+	light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 12.1f));
 
 	// create scene from file
 	vector<GeometryObject*> scene;
@@ -90,7 +93,7 @@ void Assignment3Qt::on_pushButton_Render_clicked()
 
 	// render image
 	this->ui.pushButton_Render->setEnabled(false);
-	this->repaint();
+	this->ui.pushButton_Render->repaint();
 	this->RenderImage(qtIP, scene, camera, light);
 	this->ui.pushButton_Render->setEnabled(true);
 
@@ -102,6 +105,37 @@ void Assignment3Qt::on_pushButton_Render_clicked()
 	// delete light
 	for (vector<LightBase*>::iterator i = light.begin(); i != light.end(); i++)
 		safe_delete(*i);
+}
+
+void Assignment3Qt::RenderPixels(RayTracingCameraClass* camera, int row, int start, int end, vector<glm::vec3> &pixelList,
+	vector<GeometryObject*> &scene, vector<LightBase*> &light)
+{
+	vector<RayClass*> rayList;
+	RayHitObjectRecord curRayRecord;
+	int arrayIdx = row * camera->getW() + start;
+	
+	for (int col = start; col < end; col++)
+	{
+		camera->GenerateRay(row, col, rayList);
+		// for each ray inside a pixel
+		pixelList[arrayIdx] = glm::vec3();
+		for (vector<RayClass*>::iterator i = rayList.begin(); i != rayList.end(); i++)
+		{
+			// find the hit object and hit type
+			int hitType = RayHitTest(*i, scene, light, curRayRecord);
+			if (hitType == 1)
+				pixelList[arrayIdx] += calColorOnHitPoint(curRayRecord, scene, light, 1);
+			else if (hitType == 2)
+				pixelList[arrayIdx] += curRayRecord.pointColor;
+
+			safe_delete(*i);
+		}
+		rayList.clear();
+
+		pixelList[arrayIdx] /= camera->getRayNumEachPixel();
+
+		arrayIdx++;
+	}
 }
 
 void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*> &scene, RayTracingCameraClass* camera, vector<LightBase*> &light)
@@ -116,44 +150,53 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 	vector<float> pixelListR;
 	vector<float> pixelListG;
 	vector<float> pixelListB;
-	vector<glm::vec3> pixelList; // B G R
+	vector<glm::vec3> pixelList;
 	pixelListR.resize(pixelNum);
 	pixelListG.resize(pixelNum);
 	pixelListB.resize(pixelNum);
 	pixelList.resize(pixelNum);
 
-	vector<RayClass*> rayList;
-	RayHitObjectRecord curRayRecord;
 	//#pragma omp parallel for
-	int arrayIdx = 0;
 	for (int row = 0; row < camera->getH(); row++)
 	{
-		for (int col = 0; col < camera->getW(); col++)
-		{
-			camera->GenerateRay(row, col, rayList);
-			// for each ray inside a pixel
-			pixelList[arrayIdx] = glm::vec3();
-			for (vector<RayClass*>::iterator i = rayList.begin(); i != rayList.end(); i++)
-			{
-				// find the hit object and hit type
-				int hitType = RayHitTest(*i, scene, light, curRayRecord);
-				if (hitType == 1)
-				{
-					//pixelList[arrayIdx] += calColorOnHitPoint(curRayRecord, scene, light, 1);
-				}
-				else if (hitType == 2)
-					pixelList[arrayIdx] += curRayRecord.pointColor;
+		// use multi threads, when each task is not heavy, multi thread will even slow down the process
+		std::thread processPixel[MYTHREADNUM];
 
-				safe_delete(*i);
-			}
-			rayList.clear();
-			
-			pixelList[arrayIdx] /= camera->getRayNumEachPixel();
-			pixelListR[arrayIdx] = pixelList[arrayIdx][2];
+		int start = 0, end = camera->getW() / MYTHREADNUM;
+		for (int i = 0; i < MYTHREADNUM; i++)
+		{
+			processPixel[i] = std::thread(&Assignment3Qt::RenderPixels, this, camera, row, start, end, std::ref(pixelList), scene, light);
+			start = end;
+			end += camera->getW() / MYTHREADNUM;
+			if (i == MYTHREADNUM - 1)
+				end = camera->getW() - 1;
+		}
+
+		// Join the threads
+		for (int i = 0; i < MYTHREADNUM; i++)
+			processPixel[i].join();
+
+		int arrayIdx = row * camera->getW();
+		for(int col = 0; col < camera->getW(); col++)
+		{
+			pixelListR[arrayIdx] = pixelList[arrayIdx][0];
 			pixelListG[arrayIdx] = pixelList[arrayIdx][1];
-			pixelListB[arrayIdx] = pixelList[arrayIdx][0];
+			pixelListB[arrayIdx] = pixelList[arrayIdx][2];
+
+			float localScale = 150;
+			int R = min((int)(pixelList[arrayIdx][0] * localScale), 255);
+			int G = min((int)(pixelList[arrayIdx][1] * localScale), 255);
+			int B = min((int)(pixelList[arrayIdx][2] * localScale), 255);
+			for (int rowI = 0; rowI < qtIP.imageScaleRatio; rowI++)
+				for (int colI = 0; colI < qtIP.imageScaleRatio; colI++)
+					qImage->setPixel(col * qtIP.imageScaleRatio + colI, row * qtIP.imageScaleRatio + rowI, qRgb(R, G, B));
+
 			arrayIdx++;
 		}
+
+		ui.label_Image->setPixmap(QPixmap::fromImage(*qImage));
+		this->ui.label_Image->repaint();
+		QCoreApplication::processEvents();
 	}
 
 	// calculate the scale ratio
@@ -162,20 +205,20 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 	nth_element(pixelListG.begin(), pixelListG.begin() + nthIdx, pixelListG.end());
 	nth_element(pixelListB.begin(), pixelListB.begin() + nthIdx, pixelListB.end());
 
-	float maxRadiance = glm::max(1.0f, pixelListR[nthIdx]);
+	float maxRadiance = glm::max(0.01f, pixelListR[nthIdx]);
 	maxRadiance = glm::max(maxRadiance, pixelListG[nthIdx]);
 	maxRadiance = glm::max(maxRadiance, pixelListB[nthIdx]);
 	float scale = 255.0f / maxRadiance;
 
-	arrayIdx = 0;
+	int arrayIdx = 0;
 	for (int row = 0; row < camera->getH(); row++)
 	{
 		for (int col = 0; col < camera->getW(); col++)
 		{
-			//pixelList[arrayIdx] *= scale;
-			int B = min((int)pixelList[arrayIdx][0], 255);
+			pixelList[arrayIdx] *= 100.0f;
+			int R = min((int)pixelList[arrayIdx][0], 255);
 			int G = min((int)pixelList[arrayIdx][1], 255);
-			int R = min((int)pixelList[arrayIdx][2], 255);
+			int B = min((int)pixelList[arrayIdx][2], 255);
 			for (int rowI = 0; rowI < qtIP.imageScaleRatio; rowI++)
 				for (int colI = 0; colI < qtIP.imageScaleRatio; colI++)
 					qImage->setPixel(col * qtIP.imageScaleRatio + colI, row * qtIP.imageScaleRatio + rowI, qRgb(R, G, B));
@@ -201,52 +244,59 @@ int Assignment3Qt::RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vec
 	for (vector<GeometryObject*>::iterator j = scene.begin(); j != scene.end(); j++)
 	{
 		(*j)->RayIntersection(ray, tmpRecord);
-		if (tmpRecord.depth - lightDis > -EPSILON) // the object is further than the light source
+		if (tmpRecord.depth - lightDis > -MYEPSILON) // the object is further than the light source
 			continue;
-		if (tmpRecord.depth > EPSILON && (record.depth > tmpRecord.depth || record.depth < EPSILON))
+		if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON))
 		{
 			record = tmpRecord;
 			hitType = 1;
 		}
-		if (lightDis != INFINITE && hitType != 0)
+		if (lightDis != MYINFINITE && hitType != 0)
 			return hitType;
 	}
-	if (lightDis == INFINITE)
+	if (lightDis == MYINFINITE)
 	{
 		for (vector<LightBase*>::iterator j = light.begin(); j != light.end(); j++)
 		{
 			(*j)->RayIntersection(ray, tmpRecord);
-			if (tmpRecord.depth > EPSILON && (record.depth > tmpRecord.depth || record.depth < EPSILON))
+			if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON))
 			{
 				record = tmpRecord;
 				hitType = 2;
 			}
-			if (lightDis != INFINITE && hitType != 0)
-				return hitType;
 		}
 	}
 
 	return hitType;
 }
 
-float ambientStrength = 0.0f;
-float diffuseStrength = 0.3f;
-float specularStrength = 0.3f;
+float diffuseStrength = 0.9f;
+float specularStrength = 1.0f - diffuseStrength;
 float levelDegenerateRatio = 0.3f;
 glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level)
 {
 	// level starts from 1
-	if (level > 1)
+	if (level > 3)
 		return glm::vec3(0, 0, 0);
+
+	glm::vec3 diffuse(0.0f);
+	glm::vec3 specular(0.0f);
 	
 	glm::vec3 reflectionColor = glm::vec3(0, 0, 0);
 	RayClass* reflectionRay = new RayClass(record.hitPoint, record.rDirection);
 	RayHitObjectRecord reflectionHitRecord;
-	if (RayHitTest(reflectionRay, scene, light, reflectionHitRecord))
-		reflectionColor = levelDegenerateRatio * max(dot(record.hitNormal, record.rDirection), 0.0f) * calColorOnHitPoint(reflectionHitRecord, scene, light, level + 1);
+	int hitType = RayHitTest(reflectionRay, scene, light, reflectionHitRecord);
+	if (hitType == 1)
+	{
+		glm::vec3 recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, light, level + 1);
+		reflectionColor = levelDegenerateRatio * max(dot(record.hitNormal, record.rDirection), 0.0f) * recursiveHitPointColor;
+	}
+	else if (hitType == 2)
+	{
+		specular += specularStrength * reflectionHitRecord.pointColor;
+	}
 	safe_delete(reflectionRay);
 
-	glm::vec3 returnColor = glm::vec3(0, 0, 0);
 	RayHitObjectRecord lightHitRecord;
 	// for each light source
 	std::vector<glm::vec3> lightColorList;
@@ -259,33 +309,28 @@ glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<G
 		lightDirList.clear();
 		(*i)->GetLight(record.hitPoint, lightColorList, lightDisList, lightDirList);
 
-		glm::vec3 ambientColor(0.0f);
-		glm::vec3 diffuse(0.0f);
-		glm::vec3 specular(0.0f);
 		for (unsigned int j = 0; j < lightDirList.size(); j++)
 		{
-			ambientColor += ambientStrength * lightColorList[j];
-
 			RayClass* lightRay = new RayClass(record.hitPoint, lightDirList[j]);
 			if (!RayHitTest(lightRay, scene, light, lightHitRecord, lightDisList[j]))
 			{
 				float diff = max(dot(record.hitNormal, lightDirList[j]), 0.0f);
 				diffuse += diffuseStrength * diff * lightColorList[j];
-
-				float spec = pow(max(dot(record.rDirection, lightDirList[j]), 0.0f), 512);
-				specular += specularStrength * spec * lightColorList[j];
 			}
 
 			safe_delete(lightRay);
 		}
-		returnColor += ambientColor + diffuse / (float)lightDirList.size() + specular;
 	}
+
+	glm::vec3 returnColor = glm::vec3(0);
+	returnColor += diffuse / (float)lightDirList.size() * 1.0f + specular;
 	//if (1 == level)
 	//	returnColor = glm::vec3(0, 0, 0);
 
 	returnColor += reflectionColor;
 
 	returnColor *= record.pointColor;
+
 	return returnColor;
 }
 

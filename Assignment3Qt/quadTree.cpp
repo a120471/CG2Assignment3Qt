@@ -28,7 +28,7 @@ QuadTree::QuadTree(glm::vec3 **data, int n, float size)
 		}
 	}
 	
-	BuildQTree(data, 0, 0, n);	
+	BuildQTree(0, 0, n);	
 }
 
 QuadTree::~QuadTree()
@@ -38,7 +38,7 @@ QuadTree::~QuadTree()
 	delete[] sumMatrix;
 }
 
-void QuadTree::BuildQTree(glm::vec3 **data, int sR, int sC, int n)
+void QuadTree::BuildQTree(int sR, int sC, int n)
 {
 	int n_2 = n / 2;
 	glm::vec3 value = sumMatrix[sR + n - 1][sC + n - 1] + sumMatrix[sR][sC] - sumMatrix[sR + n - 1][sC] - sumMatrix[sR][sC + n - 1];
@@ -46,12 +46,13 @@ void QuadTree::BuildQTree(glm::vec3 **data, int sR, int sC, int n)
 	{
 		posRC.push_back(glm::ivec2(sR + n_2, sC + n_2));
 		sizeWH.push_back(glm::vec2(n * unitSize));
+		resoWH.push_back(glm::ivec2(n));
 		areaColor.push_back(value);
 		return;
 	}
 	
-	BuildQTree(data, sR, sC, n / 2);
-	BuildQTree(data, sR, sC + n_2, n / 2);
-	BuildQTree(data, sR + n_2, sC, n / 2);
-	BuildQTree(data, sR + n / 2, sC + n_2, n / 2);
+	BuildQTree(sR, sC, n_2);
+	BuildQTree(sR, sC + n_2, n_2);
+	BuildQTree(sR + n_2, sC, n_2);
+	BuildQTree(sR + n_2, sC + n_2, n_2);
 }

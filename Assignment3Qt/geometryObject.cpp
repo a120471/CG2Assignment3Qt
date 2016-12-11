@@ -34,12 +34,12 @@ void Sphere::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 	float C = dot(sc, sc) - this->radius*this->radius;
 
 	float det = B*B - 4 * A*C;
-	if (det > EPSILON)
+	if (det > MYEPSILON)
 	{
 		float t1 = (-B - sqrt(det)) / (2 * A);
 		float t2 = (-B + sqrt(det)) / (2 * A);
 
-		if (t1 > EPSILON)
+		if (t1 > MYEPSILON)
 		{
 			rhor.hitPoint = ray->getPoint(t1);
 			rhor.hitNormal = normalize(rhor.hitPoint - this->center);
@@ -48,7 +48,7 @@ void Sphere::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 			rhor.depth = t1;
 			return;
 		}
-		else if (t2 > EPSILON)
+		else if (t2 > MYEPSILON)
 		{
 			rhor.hitPoint = ray->getPoint(t2);
 			rhor.hitNormal = normalize(rhor.hitPoint - this->center);
@@ -79,8 +79,8 @@ Plane::Plane(float A, float B, float C, float D, glm::vec3 color)
 	, ABC{ glm::vec3(A, B, C) }
 	, D{D}
 {
-	this->AA = glm::vec3(-INFINITE);
-	this->BB = glm::vec3(INFINITE);
+	this->AA = glm::vec3(-MYINFINITE);
+	this->BB = glm::vec3(MYINFINITE);
 
 	this->normal = normalize(glm::vec3(A, B, C));
 }
@@ -93,7 +93,7 @@ void Plane::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 	float numerator = -this->D - dot(this->ABC, sp);
 
 	float t = numerator / denominator;
-	if (t > EPSILON)
+	if (t > MYEPSILON)
 	{
 		rhor.hitPoint = ray->getPoint(t);
 		rhor.hitNormal = this->normal;
@@ -145,7 +145,7 @@ void Triangle::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 	float b1 = dot(cross(d, eAC), s) / denominator;
 	float b2 = dot(cross(eAB, d), s) / denominator;
 	float t = dot(cross(eAB, eAC), s) / denominator;
-	if (t > EPSILON && b1 > -EPSILON && b2 > -EPSILON && b1 + b2 < 1 + EPSILON)
+	if (t > MYEPSILON && b1 > -MYEPSILON && b2 > -MYEPSILON && b1 + b2 < 1 + MYEPSILON)
 	{
 		rhor.hitPoint = ray->getPoint(t);
 		rhor.hitNormal = normalize((1 - b1 - b2) * A.Normal + b1 * B.Normal + b2 * C.Normal);
@@ -205,7 +205,7 @@ void Mesh::HitTree(RayClass* ray, SpaceKDTree::TreeNode* node, RayHitObjectRecor
 			for (std::vector<int>::iterator i = node->triangleIdx.begin(); i != node->triangleIdx.end(); i++)
 			{
 				this->faceTriangles[*i]->RayIntersection(ray, rhorT);
-				if (rhorT.depth > EPSILON && (rhor.depth > rhorT.depth || rhor.depth < EPSILON))
+				if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON))
 				{
 					rhor = rhorT;
 				}
@@ -252,7 +252,7 @@ void Model::RayIntersection(RayClass* Ray, RayHitObjectRecord &rhor)
 	for (unsigned int i = 0; i < meshes.size(); i++)
 	{
 		meshes[i]->RayIntersection(Ray, rhorT);
-		if (rhorT.depth > EPSILON && (rhor.depth > rhorT.depth || rhor.depth < EPSILON))
+		if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON))
 		{
 			rhor = rhorT;
 		}

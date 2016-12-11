@@ -8,6 +8,7 @@
 #include "quadTree.h"
 #include "geometryObject.h"
 
+// we normalize light color in unit voxel space, may be too big?!
 class LightBase
 {
 public:
@@ -18,7 +19,7 @@ public:
 	virtual void RayIntersection(RayClass*, RayHitObjectRecord&) = 0;
 };
 
-
+// a voxel point light, will a vexel be toooooo big?
 class PointLight : public LightBase
 {
 public:
@@ -36,7 +37,7 @@ private:
 class AreaLight : public LightBase
 {
 public:
-	AreaLight(float w, float h, glm::vec3 pos, glm::vec3 totalColor, glm::vec3 dRight, glm::vec3 dDown);
+	AreaLight(glm::vec2 areaWH, glm::ivec2 resoWH, glm::vec3 pos, glm::vec3 totalColor, glm::vec3 dRight, glm::vec3 dDown);
 	virtual ~AreaLight();
 
 	virtual void GetLight(glm::vec3, std::vector<glm::vec3>&, std::vector<float>&, std::vector<glm::vec3>&) override;
@@ -44,7 +45,7 @@ public:
 	virtual void RayIntersection(RayClass*, RayHitObjectRecord&) override;
 
 private:
-	glm::vec3 totalColor, pos, normal;
+	glm::vec3 unitColor, pos, normal;
 	float w, h;
 	std::vector<PointLight*> pointSamples;
 };
