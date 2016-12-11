@@ -8,6 +8,8 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+bool hasHDRLighting;
+
 #pragma region PointLight
 PointLight::PointLight(glm::vec3 pos, glm::vec3 color)
 	: color(color)
@@ -66,6 +68,7 @@ void AreaLight::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, st
 	for (int i = 0; i < pointSamples.size(); i++)
 	{
 		pointSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
+		colorList.back() *= w * h;
 	}
 }
 void AreaLight::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
@@ -212,6 +215,7 @@ void SquareMap::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 CubeMap::CubeMap(std::string cubeMapPath, float size)
 	: loadImage(NULL)
 {
+	hasHDRLighting = stbi_is_hdr(cubeMapPath.c_str());
 	loadImage = stbi_loadf(cubeMapPath.c_str(), &width, &height, &dimension, 0);
 	N = width > height ? width / 4 : height / 4;
 	
@@ -331,7 +335,7 @@ void CubeMap::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, std:
 void CubeMap::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)
 {
 	RayHitObjectRecord rhorT;
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		SquareMap *p;
 		if (i == 0) p = this->top;

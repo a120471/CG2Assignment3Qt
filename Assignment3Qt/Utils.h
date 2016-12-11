@@ -26,8 +26,10 @@
 #endif // !NTHIDX
 
 #ifndef MYTHREADNUM
-#define MYTHREADNUM 16
+#define MYTHREADNUM 8
 #endif // !MYTHREADNUM
+
+extern bool hasHDRLighting;
 
 template<typename T> void safe_delete(T*& a)
 {
@@ -69,9 +71,9 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 		return false;
 	if (dz < MYEPSILON && (A_RS.z > MYEPSILON || B_RS.z < -MYEPSILON))
 		return false;
-	
+
 	float maxTMin = -MYINFINITE, minTMax = MYINFINITE, maxTMax = -MYINFINITE;
-	
+
 	if (dx > MYEPSILON)
 	{
 		float t1 = A_RS.x / ray->direction.x;
@@ -82,7 +84,7 @@ static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 		if (maxTMin < t1) maxTMin = t1;
 		if (minTMax > t2) minTMax = t2;
 		if (maxTMax < t2) maxTMax = t2;
-	}	
+	}
 	if (dy > MYEPSILON)
 	{
 		float t1 = A_RS.y / ray->direction.y;

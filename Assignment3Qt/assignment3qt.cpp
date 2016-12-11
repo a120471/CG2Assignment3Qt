@@ -14,6 +14,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Utils.h"
+
 using namespace std;
 
 Assignment3Qt::Assignment3Qt(QWidget *parent)
@@ -157,6 +159,7 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 	pixelList.resize(pixelNum);
 
 	//#pragma omp parallel for
+	float localMax = 0.01f;
 	for (int row = 0; row < camera->getH(); row++)
 	{
 		// use multi threads, when each task is not heavy, multi thread will even slow down the process
@@ -182,8 +185,15 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 			pixelListR[arrayIdx] = pixelList[arrayIdx][0];
 			pixelListG[arrayIdx] = pixelList[arrayIdx][1];
 			pixelListB[arrayIdx] = pixelList[arrayIdx][2];
+			localMax = glm::max(localMax, pixelListR[arrayIdx]);
+			localMax = glm::max(localMax, pixelListG[arrayIdx]);
+			localMax = glm::max(localMax, pixelListB[arrayIdx]);
 
-			float localScale = 150;
+			float localScale;
+			if (hasHDRLighting)
+				localScale = 255.0f * 19.0f / localMax;
+			else
+				localScale = 255.0f / localMax;
 			int R = min((int)(pixelList[arrayIdx][0] * localScale), 255);
 			int G = min((int)(pixelList[arrayIdx][1] * localScale), 255);
 			int B = min((int)(pixelList[arrayIdx][2] * localScale), 255);
@@ -200,7 +210,7 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 	}
 
 	// calculate the scale ratio
-	int nthIdx = pixelNum * NTHIDX;
+	int nthIdx = pixelNum * NTHIDX - 1;
 	nth_element(pixelListR.begin(), pixelListR.begin() + nthIdx, pixelListR.end());
 	nth_element(pixelListG.begin(), pixelListG.begin() + nthIdx, pixelListG.end());
 	nth_element(pixelListB.begin(), pixelListB.begin() + nthIdx, pixelListB.end());
@@ -215,7 +225,7 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 	{
 		for (int col = 0; col < camera->getW(); col++)
 		{
-			pixelList[arrayIdx] *= 100.0f;
+			pixelList[arrayIdx] *= scale;
 			int R = min((int)pixelList[arrayIdx][0], 255);
 			int G = min((int)pixelList[arrayIdx][1], 255);
 			int B = min((int)pixelList[arrayIdx][2], 255);
@@ -323,7 +333,7 @@ glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<G
 	}
 
 	glm::vec3 returnColor = glm::vec3(0);
-	returnColor += diffuse / (float)lightDirList.size() * 1.0f + specular;
+	returnColor += diffuse / (float)lightDirList.size() + specular;
 	//if (1 == level)
 	//	returnColor = glm::vec3(0, 0, 0);
 

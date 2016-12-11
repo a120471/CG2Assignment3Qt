@@ -42,7 +42,7 @@ void QuadTree::BuildQTree(int sR, int sC, int n)
 {
 	int n_2 = n / 2;
 	glm::vec3 value = sumMatrix[sR + n - 1][sC + n - 1] + sumMatrix[sR][sC] - sumMatrix[sR + n - 1][sC] - sumMatrix[sR][sC + n - 1];
-	if (value.x < COLORINTENSITYTHRES || value.y < COLORINTENSITYTHRES || value.z < COLORINTENSITYTHRES)
+	if (value.x < COLORINTENSITYTHRES && value.y < COLORINTENSITYTHRES && value.z < COLORINTENSITYTHRES)
 	{
 		posRC.push_back(glm::ivec2(sR + n_2, sC + n_2));
 		sizeWH.push_back(glm::vec2(n * unitSize));
