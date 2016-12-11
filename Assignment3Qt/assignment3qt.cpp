@@ -55,8 +55,8 @@ void Assignment3Qt::on_pushButton_Render_clicked()
 
 	// create light
 	vector<LightBase*> light;
-	//light.push_back((LightBase*)new PointLight(glm::vec3(1.3, -1.3, -1.3), glm::vec3(1, 1, 1) * 0.7f));
-	//light.push_back((LightBase*)new PointLight(glm::vec3(0.8, -0.5, 3.3), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
+	//light.push_back((LightBase*)new PointLight(glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f));
+	//light.push_back((LightBase*)new PointLight(glm::vec3(-1.1, 1, 0.5), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
 	light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 12.1f));
 
 	// create scene from file
@@ -280,7 +280,7 @@ int Assignment3Qt::RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vec
 	return hitType;
 }
 
-float diffuseStrength = 0.9f;
+float diffuseStrength = 0.8f;
 float specularStrength = 1.0f - diffuseStrength;
 float levelDegenerateRatio = 0.3f;
 glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level)
