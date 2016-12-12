@@ -57,7 +57,7 @@ void Assignment3Qt::on_pushButton_Render_clicked()
 	vector<LightBase*> light;
 	//light.push_back((LightBase*)new PointLight(glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f));
 	//light.push_back((LightBase*)new PointLight(glm::vec3(-1.1, 1, 0.5), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
-	light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 12.1f));
+	light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 30.1f));
 
 	// create scene from file
 	vector<GeometryObject*> scene;
@@ -189,11 +189,7 @@ void Assignment3Qt::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*
 			localMax = glm::max(localMax, pixelListG[arrayIdx]);
 			localMax = glm::max(localMax, pixelListB[arrayIdx]);
 
-			float localScale;
-			if (hasHDRLighting)
-				localScale = 255.0f * 19.0f / localMax;
-			else
-				localScale = 255.0f / localMax;
+			float localScale = 255.0f / localMax;
 			int R = min((int)(pixelList[arrayIdx][0] * localScale), 255);
 			int G = min((int)(pixelList[arrayIdx][1] * localScale), 255);
 			int B = min((int)(pixelList[arrayIdx][2] * localScale), 255);
@@ -282,7 +278,7 @@ int Assignment3Qt::RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vec
 
 float diffuseStrength = 0.8f;
 float specularStrength = 1.0f - diffuseStrength;
-float levelDegenerateRatio = 0.3f;
+float levelDegenerateRatio = 0.5f;
 glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level)
 {
 	// level starts from 1
@@ -331,6 +327,11 @@ glm::vec3 Assignment3Qt::calColorOnHitPoint(RayHitObjectRecord &record, vector<G
 			safe_delete(lightRay);
 		}
 	}
+
+	if (!hasHDRLighting)
+		diffuse *= 15.0f;
+	else
+		diffuse *= 1.0f;
 
 	glm::vec3 returnColor = glm::vec3(0);
 	returnColor += diffuse / (float)lightDirList.size() + specular;

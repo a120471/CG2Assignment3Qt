@@ -68,7 +68,6 @@ void AreaLight::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, st
 	for (int i = 0; i < pointSamples.size(); i++)
 	{
 		pointSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
-		colorList.back() *= w * h;
 	}
 }
 void AreaLight::RayIntersection(RayClass* ray, RayHitObjectRecord &rhor)

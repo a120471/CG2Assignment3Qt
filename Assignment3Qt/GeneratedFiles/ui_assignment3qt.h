@@ -211,7 +211,7 @@ public:
         label_ICR->setText(QApplication::translate("Assignment3QtClass", "ImageScale", 0));
         imageScaleRatio->setText(QApplication::translate("Assignment3QtClass", "3", 0));
         label_CP->setText(QApplication::translate("Assignment3QtClass", "CameraPos", 0));
-        CameraPos->setText(QApplication::translate("Assignment3QtClass", "0.0, 1.0, 6.0", 0));
+        CameraPos->setText(QApplication::translate("Assignment3QtClass", "0.0, 1.0, 10.0", 0));
         label_LA->setText(QApplication::translate("Assignment3QtClass", "LookAt", 0));
         CameraLookAt->setText(QApplication::translate("Assignment3QtClass", "0.0, 0.0, 0.0", 0));
         label_SD->setText(QApplication::translate("Assignment3QtClass", "sceneData", 0));
