@@ -38,6 +38,18 @@ template<typename T> void SafeDelete(T *&p) {
 	p = nullptr;
 }
 
+bool SmallerThanEps(a, b) {
+  return a < b - MYEPSILON;
+}
+
+bool BiggerThanEps(a, b) {
+  return a > b + MYEPSILON;
+}
+
+bool ApproxiSmaller(a, b) {
+  return a < b + MYEPSILON;
+}
+
 // template <typename T>
 // void inline MySwap(T &t1, T &t2)
 // {
@@ -60,61 +72,61 @@ template<typename T> void SafeDelete(T *&p) {
 // Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
 // static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 // {
-// 	float dx = abs(ray->direction.x);
-// 	float dy = abs(ray->direction.y);
-// 	float dz = abs(ray->direction.z);
+// 	float abs_dx = abs(ray->direction.x);
+// 	float abs_dy = abs(ray->direction.y);
+// 	float abs_dz = abs(ray->direction.z);
 
 // 	glm::vec3 A_RS = A - ray->sPoint;
 // 	glm::vec3 B_RS = B - ray->sPoint;
 
-// 	if (dx < MYEPSILON && (A_RS.x > MYEPSILON || B_RS.x < -MYEPSILON))
+// 	if (abs_dx < MYEPSILON && (SmallerThanEps(ray->sPoint.x, A.x) || BiggerThanEps(ray->sPoint.x, B.x))
 // 		return false;
-// 	if (dy < MYEPSILON && (A_RS.y > MYEPSILON || B_RS.y < -MYEPSILON))
+// 	if (abs_dy < MYEPSILON && (SmallerThanEps(ray->sPoint.y, A.y) || BiggerThanEps(ray->sPoint.y, B.y))
 // 		return false;
-// 	if (dz < MYEPSILON && (A_RS.z > MYEPSILON || B_RS.z < -MYEPSILON))
+// 	if (abs_dz < MYEPSILON && (SmallerThanEps(ray->sPoint.z, A.z) || BiggerThanEps(ray->sPoint.z, B.z))
 // 		return false;
 
-// 	float t_min = -MYINFINITE, t_max = MYINFINITE;
+// 	float max_tmin = -MYINFINITE, min_tmax = MYINFINITE;
 
 // 	bool valid = false;
-// 	if (dx > MYEPSILON)
+// 	if (abs_dx > MYEPSILON)
 // 	{
 // 		float t1 = A_RS.x / ray->direction.x;
 // 		float t2 = B_RS.x / ray->direction.x;
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		t_min = std::max(t_min, t1);
-// 		t_max = std::min(t_max, t2);
+// 		max_tmin = std::max(max_tmin, t1);
+// 		min_tmax = std::min(min_tmax, t2);
 // 		if (t2 > 0)
 // 			valid = true;
 // 	}
-// 	if (dy > MYEPSILON)
+// 	if (abs_dy > MYEPSILON)
 // 	{
 // 		float t1 = A_RS.y / ray->direction.y;
 // 		float t2 = B_RS.y / ray->direction.y;
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		t_min = std::max(t_min, t1);
-// 		t_max = std::min(t_max, t2);
+// 		max_tmin = std::max(max_tmin, t1);
+// 		min_tmax = std::min(min_tmax, t2);
 // 		if (t2 > 0)
 // 			valid = true;
 // 	}
-// 	if (dz > MYEPSILON)
+// 	if (abs_dz > MYEPSILON)
 // 	{
 // 		float t1 = A_RS.z / ray->direction.z;
 // 		float t2 = B_RS.z / ray->direction.z;
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		t_min = std::max(t_min, t1);
-// 		t_max = std::min(t_max, t2);
+// 		max_tmin = std::max(max_tmin, t1);
+// 		min_tmax = std::min(min_tmax, t2);
 // 		if (t2 > 0)
 // 			valid = true;
 // 	}
 
-// 	if (t_min < t_max + MYEPSILON && valid)
+// 	if (max_tmin < min_tmax + MYEPSILON && valid)
 // 		return true;
 // 	else
 // 		return false;
