@@ -57,6 +57,7 @@ template<typename T> void SafeDelete(T *&p) {
 // 	B[2] = glm::max(B1[2], B2[2]);
 // }
 
+// Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
 // static bool RayHitAABB(RayClass *ray, glm::vec3 A, glm::vec3 B)
 // {
 // 	float dx = abs(ray->direction.x);
@@ -73,8 +74,9 @@ template<typename T> void SafeDelete(T *&p) {
 // 	if (dz < MYEPSILON && (A_RS.z > MYEPSILON || B_RS.z < -MYEPSILON))
 // 		return false;
 
-// 	float maxTMin = -MYINFINITE, minTMax = MYINFINITE, maxTMax = -MYINFINITE;
+// 	float t_min = -MYINFINITE, t_max = MYINFINITE;
 
+// 	bool valid = false;
 // 	if (dx > MYEPSILON)
 // 	{
 // 		float t1 = A_RS.x / ray->direction.x;
@@ -82,9 +84,10 @@ template<typename T> void SafeDelete(T *&p) {
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		if (maxTMin < t1) maxTMin = t1;
-// 		if (minTMax > t2) minTMax = t2;
-// 		if (maxTMax < t2) maxTMax = t2;
+// 		t_min = std::max(t_min, t1);
+// 		t_max = std::min(t_max, t2);
+// 		if (t2 > 0)
+// 			valid = true;
 // 	}
 // 	if (dy > MYEPSILON)
 // 	{
@@ -93,9 +96,10 @@ template<typename T> void SafeDelete(T *&p) {
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		if (maxTMin < t1) maxTMin = t1;
-// 		if (minTMax > t2) minTMax = t2;
-// 		if (maxTMax < t2) maxTMax = t2;
+// 		t_min = std::max(t_min, t1);
+// 		t_max = std::min(t_max, t2);
+// 		if (t2 > 0)
+// 			valid = true;
 // 	}
 // 	if (dz > MYEPSILON)
 // 	{
@@ -104,12 +108,13 @@ template<typename T> void SafeDelete(T *&p) {
 // 		if (t1 > t2)
 // 			MySwap(t1, t2);
 
-// 		if (maxTMin < t1) maxTMin = t1;
-// 		if (minTMax > t2) minTMax = t2;
-// 		if (maxTMax < t2) maxTMax = t2;
+// 		t_min = std::max(t_min, t1);
+// 		t_max = std::min(t_max, t2);
+// 		if (t2 > 0)
+// 			valid = true;
 // 	}
 
-// 	if (maxTMin < minTMax + MYEPSILON && maxTMax > MYEPSILON)
+// 	if (t_min < t_max + MYEPSILON && valid)
 // 		return true;
 // 	else
 // 		return false;
