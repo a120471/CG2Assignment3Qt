@@ -1,13 +1,18 @@
 #include "MainWindow.h"
+#include <memory>
 #include <QBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include "Utils.h"
+#include "LightSource.h"
+#include "GeometryObject.h"
+#include "RayTracingCamera.h"
 
 const glm::uvec2 RESOLUTION = glm::uvec2(400u, 300u);
 const uint32_t MULTI_SAMPLING = 1u;
@@ -32,6 +37,45 @@ const QString SCENE_FILE_PATH = QString("../../Scene.txt");
 
 // #include "Utils.h"
 
+namespace {
+
+using namespace ray_tracing;
+
+void ParseSceneLineData(std::vector<GeometryObject*> &scene,
+  const QString &line) {
+  QStringList level1 = line.split(';', QString::SkipEmptyParts);
+
+  if (level1.size() != 0) {
+    QStringList level2;
+    if (level1[0].toLower() == "sphere") {
+      level2 = level1[1].split(',');
+      glm::vec3 center(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
+
+      float radius = level1[2].toFloat();
+
+      level2 = level1[3].split(',');
+      glm::vec3 color(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
+
+      scene.emplace_back((GeometryObject*)new Sphere(center, radius, color));
+    } else if (level1[0].toLower() == "plane") {
+      level2 = level1[1].split(',');
+      glm::vec4 ABCD(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat(), level2[3].toFloat());
+
+      level2 = level1[2].split(',');
+      glm::vec3 color(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
+
+      scene.emplace_back((GeometryObject*)new Plane(ABCD[0], ABCD[1], ABCD[2], ABCD[3], color));
+    } else if (level1[0].toLower() == "model") {
+      level2 = level1[2].split(',');
+      glm::vec3 color(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
+
+      scene.emplace_back((GeometryObject*)new Model(level1[1].toStdString(), color));
+    }
+  }
+}
+
+}
+
 namespace ray_tracing {
 
 MainWindow::MainWindow(QWidget *parent)
@@ -45,6 +89,8 @@ MainWindow::MainWindow(QWidget *parent)
 
   connect(scene_file_button_, &QPushButton::clicked,
     this, &MainWindow::ChooseSceneFile);
+  connect(render_button_, &QPushButton::clicked,
+    this, &MainWindow::RenderScene);
 }
 
 MainWindow::~MainWindow() {
@@ -69,12 +115,15 @@ void MainWindow::InitUI() {
   auto image_h = new QLineEdit(QString::number(RESOLUTION.y), this);
   resolution->addWidget(image_w);
   resolution->addWidget(image_h);
+  resolution_vec_.clear();
+  resolution_vec_.emplace_back(image_w);
+  resolution_vec_.emplace_back(image_h);
 
-  auto multi_sampling = new QLineEdit(QString::number(MULTI_SAMPLING), this);
-  right_layout->addRow("Multi Sampling", multi_sampling);
+  multi_sampling_ = new QLineEdit(QString::number(MULTI_SAMPLING), this);
+  right_layout->addRow("Multi Sampling", multi_sampling_);
 
-  auto scale_ratio = new QLineEdit(QString::number(IMAGE_SCALE_RATIO), this);
-  right_layout->addRow("Image Scale Ratio", scale_ratio);
+  scale_ratio_ = new QLineEdit(QString::number(IMAGE_SCALE_RATIO), this);
+  right_layout->addRow("Image Scale Ratio", scale_ratio_);
 
   auto spacer1 = new QSpacerItem(20, 20);
   right_layout->addItem(spacer1);
@@ -87,6 +136,10 @@ void MainWindow::InitUI() {
   camera_pos->addWidget(cam_x);
   camera_pos->addWidget(cam_y);
   camera_pos->addWidget(cam_z);
+  cam_pos_vec_.clear();
+  cam_pos_vec_.emplace_back(cam_x);
+  cam_pos_vec_.emplace_back(cam_y);
+  cam_pos_vec_.emplace_back(cam_z);
 
   auto lookat = new QHBoxLayout();
   right_layout->addRow("Lookat", lookat);
@@ -96,6 +149,10 @@ void MainWindow::InitUI() {
   lookat->addWidget(lookat_x);
   lookat->addWidget(lookat_y);
   lookat->addWidget(lookat_z);
+  cam_lookat_vec_.clear();
+  cam_lookat_vec_.emplace_back(lookat_x);
+  cam_lookat_vec_.emplace_back(lookat_y);
+  cam_lookat_vec_.emplace_back(lookat_z);
 
   auto spacer2 = new QSpacerItem(20, 20);
   right_layout->addItem(spacer2);
@@ -109,17 +166,16 @@ void MainWindow::InitUI() {
   auto spacer3 = new QSpacerItem(20, 20);
   right_layout->addItem(spacer3);
 
-  auto render = new QPushButton("Render", this);
-  right_layout->addRow(render);
+  render_button_ = new QPushButton("Render", this);
+  right_layout->addRow(render_button_);
 
   auto render_time = new QLabel("Time: 0s", this);
   right_layout->addRow(render_time);
 }
 
 void MainWindow::ChooseSceneFile() {
-  auto dialog = new QFileDialog(this);
+  auto dialog = std::make_shared<QFileDialog>(new QFileDialog(this));
   dialog->setWindowTitle("Select the scene file");
-  // dialog->setDirectory("");
   dialog->setFileMode(QFileDialog::ExistingFile);
   dialog->setNameFilter(QString("Text (*.txt)"));
   if (dialog->exec() == QDialog::Accepted) {
@@ -128,69 +184,69 @@ void MainWindow::ChooseSceneFile() {
     QByteArray ba = path.toLatin1();
     scene_file_text_->setText(ba.data());
   }
-  SafeDelete(dialog);
 }
 
-// // begin to render
-// void MainWindow::on_pushButton_Render_clicked()
-// {
-//   // ALL COLORS ARE stored in RGB CHANNELS
+void MainWindow::RenderScene() {
+  // // ALL COLORS ARE stored in RGB CHANNELS
 
-//   // create light
-//   vector<LightBase*> light;
-//   //light.push_back((LightBase*)new PointLight(glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f));
-//   //light.push_back((LightBase*)new PointLight(glm::vec3(-1.1, 1, 0.5), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
-//   light.push_back((LightBase*)new CubeMap("../cubeMap.hdr", 30.1f));
+  // Create lights
+  std::vector<std::shared_ptr<LightBase>> lights;
+  auto aas = new PointLight(
+    glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f);
+  // auto light1 = std::make_shared<PointLight>(new PointLight(
+  //   glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f));
+  // lights.emplace_back(std::move(light1));
+  //light.emplace_back((LightBase*)new PointLight(glm::vec3(-1.1, 1, 0.5), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
+  // light.emplace_back((LightBase*)new CubeMap("../cubeMap.hdr", 30.1f));
 
-//   // create scene from file
-//   vector<GeometryObject*> scene;
-//   QString sceneDataPath = ui.sceneDataPath->text();
-//   QFile sceneDataFile(sceneDataPath);
-//   if (!sceneDataFile.open(QIODevice::ReadOnly | QIODevice::Text))
-//     return;
-//   QTextStream in(&sceneDataFile);
-//   while (!in.atEnd())
-//   {
-//     QString line = in.readLine();
-//     line = line.remove(' ');
-//     processSceneData(scene, line);
-//   }
-//   sceneDataFile.close();
+  // Create scene
+  std::vector<GeometryObject*> scene;
+  QFile scene_file(scene_file_text_->text());
+  if (!scene_file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return;
+  }
+  QTextStream in(&scene_file);
+  while (!in.atEnd()) {
+    QString line = in.readLine();
+    line = line.remove(' ');
+    ParseSceneLineData(scene, line);
+  }
+  scene_file.close();
 
-//   // read camera param
-//   QStringList cameraPosList = ui.CameraPos->text().split(',');
-//   glm::vec3 cameraPos = glm::vec3(cameraPosList[0].toFloat(), cameraPosList[1].toFloat(), cameraPosList[2].toFloat());
-//   QStringList cameraLookatList = ui.CameraLookAt->text().split(',');
-//   glm::vec3 cameraLookat = glm::vec3(cameraLookatList[0].toFloat(), cameraLookatList[1].toFloat(), cameraLookatList[2].toFloat());
-//   QTInputParam qtIP;
-//   qtIP.resolutionW = ui.resolutionW->text().toInt();
-//   qtIP.resolutionH = ui.resolutionH->text().toInt();
-//   qtIP.antiAliasingLevel = ui.antiAliasing->text().toInt();
-//   qtIP.imageScaleRatio = ui.imageScaleRatio->text().toInt();
-//   // create camera
-//   RayTracingCameraClass* camera = new RayTracingCameraClass(cameraPos, cameraLookat, glm::vec3(0, 1, 0), qtIP.antiAliasingLevel);
-//   camera->setW(qtIP.resolutionW); // pixel width resolution
-//   camera->setH(qtIP.resolutionH); // pixel height resolution
-//   camera->setFL(8);  // help to set image center?
-//   camera->setIW(8);
-//   camera->setIH(6);
-//   camera->setP(camera->getPos() + camera->getFront() * camera->getFL());
+  // Create camera
+  glm::vec3 cam_pos(cam_pos_vec_[0]->text().toFloat(),
+    cam_pos_vec_[1]->text().toFloat(),
+    cam_pos_vec_[2]->text().toFloat());
+  glm::vec3 lookat(cam_lookat_vec_[0]->text().toFloat(),
+    cam_lookat_vec_[1]->text().toFloat(),
+    cam_lookat_vec_[2]->text().toFloat());
+  RenderParams params;
+  params.resolution = glm::uvec2(resolution_vec_[0]->text().toUInt(),
+  resolution_vec_[1]->text().toUInt());
+  params.multi_sampling = multi_sampling_->text().toInt();
+  params.image_scale_ratio = scale_ratio_->text().toInt();
 
-//   // render image
-//   this->ui.pushButton_Render->setEnabled(false);
-//   this->ui.pushButton_Render->repaint();
-//   this->RenderImage(qtIP, scene, camera, light);
-//   this->ui.pushButton_Render->setEnabled(true);
+  RayTracingCamera *camera = new RayTracingCamera(
+    cam_pos, lookat, glm::vec3(0, 1, 0), params.multi_sampling);
+  camera->SetResolution(params.resolution); // pixel resolution
+  camera->SetWHF(glm::vec3(8, 6, 8));  // help to set image center?
+  camera->SetP(camera->getPos() + camera->getFront() * camera->GetWHF().z);
 
-//   // delete camera
-//   safe_delete(camera);
-//   // delete scene
-//   for (vector<GeometryObject*>::iterator i = scene.begin(); i != scene.end(); i++)
-//     safe_delete(*i);
-//   // delete light
-//   for (vector<LightBase*>::iterator i = light.begin(); i != light.end(); i++)
-//     safe_delete(*i);
-// }
+  // // render image
+  // this->ui.pushButton_Render->setEnabled(false);
+  // this->ui.pushButton_Render->repaint();
+  // this->RenderImage(params, scene, camera, light);
+  // this->ui.pushButton_Render->setEnabled(true);
+
+  // // delete camera
+  // safe_delete(camera);
+  // // delete scene
+  // for (vector<GeometryObject*>::iterator i = scene.begin(); i != scene.end(); i++)
+  //   safe_delete(*i);
+  // // delete light
+  // for (vector<LightBase*>::iterator i = light.begin(); i != light.end(); i++)
+  //   safe_delete(*i);
+}
 
 // void MainWindow::RenderPixels(RayTracingCameraClass* camera, int row, int start, int end, vector<glm::vec3> &pixelList,
 //   vector<GeometryObject*> &scene, vector<LightBase*> &light)
@@ -426,45 +482,6 @@ void MainWindow::ChooseSceneFile() {
 //   returnColor *= record.pointColor;
 
 //   return returnColor;
-// }
-
-// void MainWindow::processSceneData(vector<GeometryObject*> &scene, QString line)
-// {
-//   QStringList level1 = line.split(';', QString::SkipEmptyParts);
-
-//   if (level1.length() != 0)
-//   {
-//     QStringList level2;
-//     if ("Sphere" == level1[0] || "sphere" == level1[0])
-//     {
-//       level2 = level1[1].split(',');
-//       glm::vec3 center = glm::vec3(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
-
-//       float radius = level1[2].toFloat();
-
-//       level2 = level1[3].split(',');
-//       glm::vec3 color = glm::vec3(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
-
-//       scene.push_back((GeometryObject*)new Sphere(center, radius, color));
-//     }
-//     else if ("Plane" == level1[0] || "plane" == level1[0])
-//     {
-//       level2 = level1[1].split(',');
-//       glm::vec4 ABCD = glm::vec4(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat(), level2[3].toFloat());
-
-//       level2 = level1[2].split(',');
-//       glm::vec3 color = glm::vec3(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
-
-//       scene.push_back((GeometryObject*)new Plane(ABCD[0], ABCD[1], ABCD[2], ABCD[3], color));
-//     }
-//     else if ("Model" == level1[0] || "model" == level1[0])
-//     {
-//       level2 = level1[2].split(',');
-//       glm::vec3 color = glm::vec3(level2[0].toFloat(), level2[1].toFloat(), level2[2].toFloat());
-
-//       scene.push_back((GeometryObject*)new Model(level1[1].toStdString(), color));
-//     }
-//   }
 // }
 
 }

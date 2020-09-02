@@ -2,19 +2,17 @@
 
 // #include <vector>
 #include <QMainWindow>
+#include <glm/vec2.hpp>
 // #include "rayTracingCamera.h"
 // #include "geometryObject.h"
 // #include "lightSource.h"
 // #include "Utils.h"
 
-// // struct for qt UI input paramschrome
-// struct QTInputParam
-// {
-//   int resolutionW;
-//   int resolutionH;
-//   int antiAliasingLevel;
-//   int imageScaleRatio;
-// };
+struct RenderParams {
+  glm::uvec2 resolution;
+  int multi_sampling;
+  int image_scale_ratio;
+};
 
 class QPushButton;
 class QLineEdit;
@@ -36,21 +34,24 @@ public:
 
 private slots:
 	void ChooseSceneFile();
+	void RenderScene();
 
 private:
   void InitUI();
 
 	QPushButton *scene_file_button_;
 	QLineEdit *scene_file_text_;
+  QPushButton *render_button_;
 
-  // // scene is loaded from text, so we need to deal with the line data
-  // void processSceneData(vector<GeometryObject*> &scene, QString line);
+  std::vector<QLineEdit*> cam_pos_vec_;
+  std::vector<QLineEdit*> cam_lookat_vec_;
+
+  std::vector<QLineEdit*> resolution_vec_;
+  QLineEdit *multi_sampling_;
+  QLineEdit *scale_ratio_;
 
   // void RenderPixels(RayTracingCameraClass* camera, int row, int start, int end, vector<glm::vec3> &pixelList,
   //   vector<GeometryObject*> &scene, vector<LightBase*> &light);
-
-// // begin to render
-// void on_pushButton_Render_clicked();
 };
 
 }

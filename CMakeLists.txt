@@ -15,8 +15,9 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 find_package(glm REQUIRED)
+find_package(assimp REQUIRED)
 
 file(GLOB SRC src/*.cpp)
 
 add_executable(ray_tracing_program ${SRC})
-target_link_libraries(ray_tracing_program PRIVATE Qt5::Widgets glm::glm)
+target_link_libraries(ray_tracing_program PRIVATE Qt5::Widgets glm::glm assimp::assimp)
