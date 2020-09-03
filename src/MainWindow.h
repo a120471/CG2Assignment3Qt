@@ -1,12 +1,8 @@
 #pragma once
 
-// #include <vector>
+#include <vector>
 #include <QMainWindow>
 #include <glm/vec2.hpp>
-// #include "rayTracingCamera.h"
-// #include "geometryObject.h"
-// #include "lightSource.h"
-// #include "Utils.h"
 
 struct RenderParams {
   glm::uvec2 resolution;
@@ -24,23 +20,23 @@ class MainWindow : public QMainWindow {
 
 public:
   MainWindow(QWidget *parent = 0);
-  ~MainWindow();
+  ~MainWindow() = default;
 
   // void RenderImage(const QTInputParam&, vector<GeometryObject*> &scene, RayTracingCameraClass* camera, vector<LightBase*> &light);
 
-  // int RayHitTest(RayClass* ray, vector<GeometryObject*> &scene, vector<LightBase*> &light, RayHitObjectRecord &record, float lightDis = MYINFINITE);
+  // int RayHitTest(Ray *ray, vector<GeometryObject*> &scene, vector<LightBase*> &light, RayHitObjectRecord &record, float lightDis = MYINFINITE);
 
   // glm::vec3 calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level);
 
 private slots:
-	void ChooseSceneFile();
-	void RenderScene();
+  void ChooseSceneFile();
+  void RenderScene();
 
 private:
   void InitUI();
 
-	QPushButton *scene_file_button_;
-	QLineEdit *scene_file_text_;
+  QPushButton *scene_file_button_;
+  QLineEdit *scene_file_text_;
   QPushButton *render_button_;
 
   std::vector<QLineEdit*> cam_pos_vec_;
