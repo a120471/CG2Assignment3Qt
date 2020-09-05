@@ -3,6 +3,8 @@
 #include <vector>
 #include <glm/gtc/type_ptr.hpp>
 
+namespace ray_tracing {
+
 class QuadTree {
 public:
   QuadTree(glm::vec3 **data, int n, float size);
@@ -20,3 +22,5 @@ private:
   int N;
   float unitSize;
 };
+
+}

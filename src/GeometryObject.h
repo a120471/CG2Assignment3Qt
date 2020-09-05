@@ -16,9 +16,9 @@ struct RayHitObjectRecord {
   }
 
   RayHitObjectRecord& operator=(const RayHitObjectRecord& record) {
-    if (this == &record)
+    if (this == &record) {
       return *this;
-
+    }
     this->depth = record.depth;
     this->hit_point = record.hit_point;
     this->hit_normal = record.hit_normal;
@@ -42,7 +42,7 @@ public:
   GeometryObject(const std::string &typeName, const glm::vec3 &color);
   virtual ~GeometryObject() = default;
 
-  virtual void RayIntersection(Ray *ray, RayHitObjectRecord &record) = 0;
+  virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
 
   // we need to save the bounding box to accerlerate the ray hit test
   virtual void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) = 0;
@@ -60,7 +60,7 @@ public:
   Sphere(const glm::vec3 &center, float radius,
     const glm::vec3 &color = glm::vec3(1, 1, 1));
 
-  void RayIntersection(Ray *ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
   void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) override;
 
@@ -73,7 +73,7 @@ class Plane : public GeometryObject {
 public:
   Plane(const glm::vec4 &ABCD, const glm::vec3 &color = glm::vec3(1, 1, 1));
 
-  void RayIntersection(Ray *ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
   void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) override;
 
@@ -94,7 +94,7 @@ public:
   Triangle(const Vertex &A, const Vertex &B, const Vertex &C,
     glm::vec3 color = glm::vec3(1, 1, 1));
 
-  void RayIntersection(Ray *ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
   void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) override;
 
@@ -112,9 +112,9 @@ public:
     const glm::vec3 &color = glm::vec3(1, 1, 1));
   virtual ~Mesh();
 
-  void RayIntersection(Ray *Ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
 
-  void HitTree(Ray *ray, KDTree::TreeNode *node, RayHitObjectRecord &record);
+  void HitTree(const Ray &ray, KDTree::TreeNode *node, RayHitObjectRecord &record);
 
   void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) override { /*to do*/ }
 
@@ -139,7 +139,7 @@ public:
     const glm::vec3 &color = glm::vec3(1, 1, 1));
   virtual ~Model();
 
-  void RayIntersection(Ray *Ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
 
   void GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) override { /*to do*/ }
 

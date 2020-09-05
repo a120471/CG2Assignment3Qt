@@ -18,7 +18,7 @@ public:
     std::vector<float> &distances,
     std::vector<glm::vec3> &light_dirs) = 0;
 
-  virtual void RayIntersection(Ray *ray, RayHitObjectRecord &record) = 0;
+  virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
 };
 
 // a voxel point light, will a voxel be toooooo big?
@@ -31,7 +31,7 @@ public:
     std::vector<float> &distances,
     std::vector<glm::vec3> &light_dirs) override;
 
-  void RayIntersection(Ray *ray, RayHitObjectRecord &record) override;
+  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
 private:
   glm::vec3 pos_;
@@ -45,7 +45,7 @@ private:
 
 //   void GetLight(glm::vec3, std::vector<glm::vec3>&, std::vector<float>&, std::vector<glm::vec3>&) override;
 
-//   void RayIntersection(Ray *ray, RayHitObjectRecord&) override;
+//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
 
 // private:
 //   glm::vec3 unitColor, pos, normal;
@@ -60,7 +60,7 @@ private:
 
 //   void GetLight(glm::vec3, std::vector<glm::vec3>&, std::vector<float>&, std::vector<glm::vec3>&) override;
 
-//   void RayIntersection(Ray *ray, RayHitObjectRecord&) override;
+//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
 
 // private:
 //   glm::vec3 **data;
@@ -81,7 +81,7 @@ private:
 
 //   void GetLight(glm::vec3, std::vector<glm::vec3>&, std::vector<float>&, std::vector<glm::vec3>&) override;
 
-//   void RayIntersection(Ray *ray, RayHitObjectRecord&) override;
+//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
 
 // private:
 //   float *loadImage;

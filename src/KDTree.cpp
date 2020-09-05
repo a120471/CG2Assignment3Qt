@@ -11,7 +11,7 @@ KDTree::KDTree(std::vector<Triangle*> &faces)
 }
 
 KDTree::~KDTree() {
-  DeleteKDTree(this->rootNode);
+  DeleteKDTree(rootNode);
 }
 
 void KDTree::BuildKDTree(std::vector<Triangle*> &faces,
@@ -19,7 +19,7 @@ void KDTree::BuildKDTree(std::vector<Triangle*> &faces,
   node = new TreeNode();
 
   if (tail - head <= 4) {
-    for (int i = head; i < tail; i++) {
+    for (int i = head; i < tail; ++i) {
       node->triangleIdx.emplace_back(i);
     }
     // compute the bounding box

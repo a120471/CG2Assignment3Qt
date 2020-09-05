@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 #include <memory>
+#include <mutex>
+#include <tbb/parallel_for.h>
 #include <QBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
@@ -13,27 +15,20 @@
 #include "LightSource.h"
 #include "GeometryObject.h"
 #include "RayTracingCamera.h"
-
-// #include <thread>
-// #include <omp.h>
-// #include <algorithm>
-// #include <ctime>
-
-// // GLM Mathematics (glm matrices are column-major ordering)
-// #include <glm/glm.hpp>
-// #include <glm/gtc/matrix_transform.hpp>
-// #include <glm/gtc/type_ptr.hpp>
+#include "Utils.h"
 
 const glm::uvec2 RESOLUTION = glm::uvec2(400u, 300u);
 const uint32_t MULTI_SAMPLING = 1u;
 const uint32_t IMAGE_SCALE_RATIO = 3u;
 const glm::vec3 CAMERA_POS = glm::vec3(0, 1, 10);
-const glm::vec3 LOOKAT = glm::vec3(0, 1, 10);
-const QString SCENE_FILE_PATH = QString("../../Scene.txt");
+const glm::vec3 LOOKAT = glm::vec3(0, 0, 0);
+const QString SCENE_FILE_PATH = QString("");
 
 namespace {
 
 using namespace ray_tracing;
+
+std::mutex mutex;
 
 glm::vec3 QStringListToGlmVec3(const QStringList &list) {
   return glm::vec3(list[0].toFloat(), list[1].toFloat(), list[2].toFloat());
@@ -98,9 +93,9 @@ void MainWindow::InitUI() {
   this->setCentralWidget(central_widget);
   auto layout = new QHBoxLayout(central_widget);
 
-  auto rendered_image = new QLabel("Render Result", this);
-  layout->addWidget(rendered_image);
-  rendered_image->setAlignment(Qt::AlignCenter);
+  rendered_image_ = new QLabel("Render Result", this);
+  layout->addWidget(rendered_image_);
+  rendered_image_->setAlignment(Qt::AlignCenter);
 
   auto right_layout = new QFormLayout();
   layout->addLayout(right_layout);
@@ -164,8 +159,8 @@ void MainWindow::InitUI() {
   render_button_ = new QPushButton("Render", this);
   right_layout->addRow(render_button_);
 
-  auto render_time = new QLabel("Time: 0s", this);
-  right_layout->addRow(render_time);
+  render_time_ = new QLabel("Time: 0s", this);
+  right_layout->addRow(render_time_);
 }
 
 void MainWindow::ChooseSceneFile() {
@@ -194,6 +189,7 @@ void MainWindow::RenderScene() {
   std::vector<std::shared_ptr<GeometryObject>> scene;
   QFile scene_file(scene_file_text_->text());
   if (!scene_file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    printf("file %s not exists\n", scene_file_text_->text().toStdString().c_str());
     return;
   }
   QTextStream in(&scene_file);
@@ -222,226 +218,214 @@ void MainWindow::RenderScene() {
   camera->SetWHF(glm::vec3(8, 6, 8));  // help to set image center?
   camera->SetP(camera->getPos() + camera->getFront() * camera->GetWHF().z);
 
-  // // render image
-  // this->ui.pushButton_Render->setEnabled(false);
-  // this->ui.pushButton_Render->repaint();
-  // this->RenderImage(params, scene, camera, light);
-  // this->ui.pushButton_Render->setEnabled(true);
+  // render image
+  render_button_->setEnabled(false);
+  render_button_->repaint();
+  RenderImage(params, scene, camera, lights);
+  render_button_->setEnabled(true);
 }
 
-// void MainWindow::RenderPixels(RayTracingCameraClass* camera, int row, int start, int end, vector<glm::vec3> &pixelList,
-//   vector<GeometryObject*> &scene, vector<LightBase*> &light) {
-//   vector<Ray*> rayList;
-//   RayHitObjectRecord curRayRecord;
-//   int arrayIdx = row * camera->getW() + start;
+void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
+  int pixel_id, uint32_t resolution_w,
+  std::vector<glm::vec3> &pixel_list,
+  const std::vector<std::shared_ptr<GeometryObject>> &scene,
+  const std::vector<std::shared_ptr<LightBase>> &lights) {
 
-//   for (int col = start; col < end; col++) {
-//     camera->GenerateRay(row, col, rayList);
-//     // for each ray inside a pixel
-//     pixelList[arrayIdx] = glm::vec3();
-//     for (auto i = rayList.begin(); i != rayList.end(); i++) {
-//       // find the hit object and hit type
-//       int hitType = RayHitTest(*i, scene, light, curRayRecord);
-//       if (hitType == 1)
-//         pixelList[arrayIdx] += calColorOnHitPoint(curRayRecord, scene, light, 1);
-//       else if (hitType == 2)
-//         pixelList[arrayIdx] += curRayRecord.pointColor;
+  uint32_t row = pixel_id / resolution_w;
+  uint32_t col = pixel_id % resolution_w;
+  std::vector<Ray> rays;
+  camera->GenerateRay(row, col, rays);
 
-//       safe_delete(*i);
-//     }
-//     rayList.clear();
+  // for each ray inside a pixel
+  RayHitObjectRecord record;
+  pixel_list[pixel_id] = glm::vec3();
+  for (const auto &ray : rays) {
+    // find the hit object and hit type
+    int hitType = RayHitTest(ray, scene, lights, record);
+    if (hitType == 1) {
+      pixel_list[pixel_id] += calColorOnHitPoint(record, scene, lights, 1);
+    }
+    else if (hitType == 2) {
+      pixel_list[pixel_id] += record.point_color;
+    }
+  }
 
-//     pixelList[arrayIdx] /= camera->getRayNumEachPixel();
+  pixel_list[pixel_id] /= camera->GetRayNumEachPixel();
+}
 
-//     arrayIdx++;
-//   }
-// }
+void MainWindow::RenderImage(const RenderParams &params,
+    const std::vector<std::shared_ptr<GeometryObject>> &scene,
+    const std::shared_ptr<RayTracingCamera> &camera,
+    const std::vector<std::shared_ptr<LightBase>> &lights) {
+  const clock_t begin_time = clock();
 
-// void MainWindow::RenderImage(const QTInputParam &qtIP, vector<GeometryObject*> &scene, RayTracingCameraClass* camera, vector<LightBase*> &light) {
-//   const clock_t begin_time = clock();
+  const auto &resolution = camera->GetResolution();
 
-//   // create a new image
-//   QImage *qImage = new QImage(camera->getW() * qtIP.imageScaleRatio, camera->getH() * qtIP.imageScaleRatio, QImage::Format_RGB888);
+  // Create a new image
+  std::shared_ptr<QImage> q_image = std::make_shared<QImage>(
+    resolution.x * params.image_scale_ratio,
+    resolution.y * params.image_scale_ratio,
+    QImage::Format_RGB888);
 
-//   // save all rendered pixels, we need to scale them later for visualization
-//   int pixelNum = camera->getH() * camera->getW();
-//   vector<float> pixelListR;
-//   vector<float> pixelListG;
-//   vector<float> pixelListB;
-//   vector<glm::vec3> pixelList;
-//   pixelListR.resize(pixelNum);
-//   pixelListG.resize(pixelNum);
-//   pixelListB.resize(pixelNum);
-//   pixelList.resize(pixelNum);
+  // Save rendered pixels, we need to scale them later for visualization
+  int pixel_num = resolution.x * resolution.y;
+  std::vector<float> pixel_Rs(pixel_num);
+  std::vector<float> pixel_Gs(pixel_num);
+  std::vector<float> pixel_Bs(pixel_num);
+  std::vector<glm::vec3> pixel_list(pixel_num);
 
-//   //#pragma omp parallel for
-//   float localMax = 0.01f;
-//   for (int row = 0; row < camera->getH(); row++) {
-//     // use multi threads, when each task is not heavy, multi thread will even slow down the process
-//     std::thread processPixel[MYTHREADNUM];
+  float brightest = 0.01f;
+  tbb::parallel_for (tbb::blocked_range<int>(0, pixel_num),
+    [&](tbb::blocked_range<int> r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      RenderPixels(camera, i, resolution.x, pixel_list, scene, lights);
 
-//     int start = 0, end = camera->getW() / MYTHREADNUM;
-//     for (int i = 0; i < MYTHREADNUM; i++) {
-//       processPixel[i] = std::thread(&MainWindow::RenderPixels, this, camera, row, start, end, std::ref(pixelList), scene, light);
-//       start = end;
-//       end += camera->getW() / MYTHREADNUM;
-//       if (i == MYTHREADNUM - 1)
-//         end = camera->getW() - 1;
-//     }
+      pixel_Rs[i] = pixel_list[i][0];
+      pixel_Gs[i] = pixel_list[i][1];
+      pixel_Bs[i] = pixel_list[i][2];
+      mutex.lock();
+      brightest = std::max(brightest, pixel_Rs[i]);
+      brightest = std::max(brightest, pixel_Gs[i]);
+      brightest = std::max(brightest, pixel_Bs[i]);
+      mutex.unlock();
 
-//     // Join the threads
-//     for (int i = 0; i < MYTHREADNUM; i++)
-//       processPixel[i].join();
+      // rendered_image_->setPixmap(QPixmap::fromImage(q_image));
+      // rendered_image_->repaint();
+      // QCoreApplication::processEvents();
+    }
+  });
 
-//     int arrayIdx = row * camera->getW();
-//     for (int col = 0; col < camera->getW(); col++) {
-//       pixelListR[arrayIdx] = pixelList[arrayIdx][0];
-//       pixelListG[arrayIdx] = pixelList[arrayIdx][1];
-//       pixelListB[arrayIdx] = pixelList[arrayIdx][2];
-//       localMax = glm::max(localMax, pixelListR[arrayIdx]);
-//       localMax = glm::max(localMax, pixelListG[arrayIdx]);
-//       localMax = glm::max(localMax, pixelListB[arrayIdx]);
+  // calculate the scale ratio
+  int nthIdx = (int)(pixel_num * NTHIDX) - 1;
+  nth_element(pixel_Rs.begin(), pixel_Rs.begin() + nthIdx, pixel_Rs.end());
+  nth_element(pixel_Gs.begin(), pixel_Gs.begin() + nthIdx, pixel_Gs.end());
+  nth_element(pixel_Bs.begin(), pixel_Bs.begin() + nthIdx, pixel_Bs.end());
 
-//       float localScale = 255.0f / localMax;
-//       int R = min((int)(pixelList[arrayIdx][0] * localScale), 255);
-//       int G = min((int)(pixelList[arrayIdx][1] * localScale), 255);
-//       int B = min((int)(pixelList[arrayIdx][2] * localScale), 255);
-//       for (int rowI = 0; rowI < qtIP.imageScaleRatio; rowI++)
-//         for (int colI = 0; colI < qtIP.imageScaleRatio; colI++)
-//           qImage->setPixel(col * qtIP.imageScaleRatio + colI, row * qtIP.imageScaleRatio + rowI, qRgb(R, G, B));
+  float maxRadiance = std::max(0.01f, pixel_Rs[nthIdx]);
+  maxRadiance = std::max(maxRadiance, pixel_Gs[nthIdx]);
+  maxRadiance = std::max(maxRadiance, pixel_Bs[nthIdx]);
+  float scale = 255.0f / maxRadiance;
 
-//       arrayIdx++;
-//     }
+  int arrayIdx = 0;
+  for (int row = 0; row < resolution.y; ++row) {
+    for (int col = 0; col < resolution.x; ++col) {
+      pixel_list[arrayIdx] *= scale;
+      int R = std::min((int)pixel_list[arrayIdx][0], 255);
+      int G = std::min((int)pixel_list[arrayIdx][1], 255);
+      int B = std::min((int)pixel_list[arrayIdx][2], 255);
+      for (int rowI = 0; rowI < params.image_scale_ratio; ++rowI) {
+        for (int colI = 0; colI < params.image_scale_ratio; ++colI) {
+          q_image->setPixel(col * params.image_scale_ratio + colI, row * params.image_scale_ratio + rowI, qRgb(R, G, B));
+        }
+      }
 
-//     ui.label_Image->setPixmap(QPixmap::fromImage(*qImage));
-//     this->ui.label_Image->repaint();
-//     QCoreApplication::processEvents();
-//   }
+      ++arrayIdx;
+    }
+  }
 
-//   // calculate the scale ratio
-//   int nthIdx = pixelNum * NTHIDX - 1;
-//   nth_element(pixelListR.begin(), pixelListR.begin() + nthIdx, pixelListR.end());
-//   nth_element(pixelListG.begin(), pixelListG.begin() + nthIdx, pixelListG.end());
-//   nth_element(pixelListB.begin(), pixelListB.begin() + nthIdx, pixelListB.end());
+  float timeEllapse = float(clock() - begin_time) / CLOCKS_PER_SEC;
 
-//   float maxRadiance = glm::max(0.01f, pixelListR[nthIdx]);
-//   maxRadiance = glm::max(maxRadiance, pixelListG[nthIdx]);
-//   maxRadiance = glm::max(maxRadiance, pixelListB[nthIdx]);
-//   float scale = 255.0f / maxRadiance;
+  // display the image
+  rendered_image_->setPixmap(QPixmap::fromImage(*(q_image.get())));
+  render_time_->setText(QString("Time: %1s").arg(timeEllapse));
+}
 
-//   int arrayIdx = 0;
-//   for (int row = 0; row < camera->getH(); row++) {
-//     for (int col = 0; col < camera->getW(); col++) {
-//       pixelList[arrayIdx] *= scale;
-//       int R = min((int)pixelList[arrayIdx][0], 255);
-//       int G = min((int)pixelList[arrayIdx][1], 255);
-//       int B = min((int)pixelList[arrayIdx][2], 255);
-//       for (int rowI = 0; rowI < qtIP.imageScaleRatio; rowI++)
-//         for (int colI = 0; colI < qtIP.imageScaleRatio; colI++)
-//           qImage->setPixel(col * qtIP.imageScaleRatio + colI, row * qtIP.imageScaleRatio + rowI, qRgb(R, G, B));
+int MainWindow::RayHitTest(const Ray &ray,
+  const std::vector<std::shared_ptr<GeometryObject>> &scene,
+  const std::vector<std::shared_ptr<LightBase>> &lights,
+  RayHitObjectRecord &record, float lightDis) {
 
-//       arrayIdx++;
-//     }
-//   }
+  record.depth = -1;
+  int hitType = 0;
+  RayHitObjectRecord tmpRecord;
 
-//   float timeEllapse = float(clock() - begin_time) / CLOCKS_PER_SEC;
+  for (auto object : scene) {
+    object->RayIntersection(ray, tmpRecord);
+    if (tmpRecord.depth - lightDis > -MYEPSILON) { // the object is further than the light source
+      continue;
+    }
+    if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
+      record = tmpRecord;
+      hitType = 1;
+    }
+    if (lightDis != MYINFINITE && hitType != 0) {
+      return hitType;
+    }
+  }
+  if (lightDis == MYINFINITE) {
+    for (auto light : lights) {
+      light->RayIntersection(ray, tmpRecord);
+      if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
+        record = tmpRecord;
+        hitType = 2;
+      }
+    }
+  }
 
-//   // display the image
-//   ui.label_Image->setPixmap(QPixmap::fromImage(*qImage));
-//   ui.label_TValue->setText(QString().sprintf("Time: %.2fs", timeEllapse));
-//   safe_delete(qImage);
-// }
+  return hitType;
+}
 
-// int MainWindow::RayHitTest(Ray *ray, vector<GeometryObject*> &scene, vector<LightBase*> &light, RayHitObjectRecord &record, float lightDis) {
-//   record.depth = -1;
-//   int hitType = 0;
-//   RayHitObjectRecord tmpRecord;
+float diffuseStrength = 0.8f;
+float specularStrength = 1.0f - diffuseStrength;
+float levelDegenerateRatio = 0.5f;
+glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
+  const std::vector<std::shared_ptr<GeometryObject>> &scene,
+  const std::vector<std::shared_ptr<LightBase>> &lights, int level) {
+  // level starts from 1
+  if (level > 3)
+    return glm::vec3(0, 0, 0);
 
-//   for (vector<GeometryObject*>::iterator j = scene.begin(); j != scene.end(); j++) {
-//     (*j)->RayIntersection(ray, tmpRecord);
-//     if (tmpRecord.depth - lightDis > -MYEPSILON) // the object is further than the light source
-//       continue;
-//     if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
-//       record = tmpRecord;
-//       hitType = 1;
-//     }
-//     if (lightDis != MYINFINITE && hitType != 0)
-//       return hitType;
-//   }
-//   if (lightDis == MYINFINITE) {
-//     for (vector<LightBase*>::iterator j = light.begin(); j != light.end(); j++) {
-//       (*j)->RayIntersection(ray, tmpRecord);
-//       if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
-//         record = tmpRecord;
-//         hitType = 2;
-//       }
-//     }
-//   }
+  glm::vec3 diffuse(0.0f);
+  glm::vec3 specular(0.0f);
 
-//   return hitType;
-// }
+  glm::vec3 reflectionColor = glm::vec3(0, 0, 0);
+  Ray reflectionRay(record.hit_point, record.r_direction);
+  RayHitObjectRecord reflectionHitRecord;
+  int hitType = RayHitTest(reflectionRay, scene, lights, reflectionHitRecord);
+  if (hitType == 1) {
+    glm::vec3 recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, lights, level + 1);
+    reflectionColor = levelDegenerateRatio * std::max(dot(record.hit_normal, record.r_direction), 0.0f) * recursiveHitPointColor;
+  }
+  else if (hitType == 2) {
+    specular += specularStrength * reflectionHitRecord.point_color;
+  }
 
-// float diffuseStrength = 0.8f;
-// float specularStrength = 1.0f - diffuseStrength;
-// float levelDegenerateRatio = 0.5f;
-// glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record, vector<GeometryObject*> &scene, vector<LightBase*> &light, int level) {
-//   // level starts from 1
-//   if (level > 3)
-//     return glm::vec3(0, 0, 0);
+  RayHitObjectRecord lightHitRecord;
+  // for each light source
+  std::vector<glm::vec3> lightColorList;
+  std::vector<float> lightDisList;
+  std::vector<glm::vec3> lightDirList;
+  for (auto light : lights) {
+    lightColorList.clear();
+    lightDisList.clear();
+    lightDirList.clear();
+    light->GetLight(record.hit_point, lightColorList, lightDisList, lightDirList);
 
-//   glm::vec3 diffuse(0.0f);
-//   glm::vec3 specular(0.0f);
+    for (unsigned int j = 0; j < lightDirList.size(); ++j) {
+      Ray lightRay(record.hit_point, lightDirList[j]);
+      if (!RayHitTest(lightRay, scene, lights, lightHitRecord, lightDisList[j])) {
+        float diff = std::max(dot(record.hit_normal, lightDirList[j]), 0.0f);
+        diffuse += diffuseStrength * diff * lightColorList[j];
+      }
+    }
+  }
 
-//   glm::vec3 reflectionColor = glm::vec3(0, 0, 0);
-//   Ray *reflectionRay = new Ray(record.hitPoint, record.rDirection);
-//   RayHitObjectRecord reflectionHitRecord;
-//   int hitType = RayHitTest(reflectionRay, scene, light, reflectionHitRecord);
-//   if (hitType == 1) {
-//     glm::vec3 recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, light, level + 1);
-//     reflectionColor = levelDegenerateRatio * max(dot(record.hitNormal, record.rDirection), 0.0f) * recursiveHitPointColor;
-//   }
-//   else if (hitType == 2) {
-//     specular += specularStrength * reflectionHitRecord.pointColor;
-//   }
-//   safe_delete(reflectionRay);
+  if (!hasHDRLighting) {
+    diffuse *= 15.0f;
+  } else {
+    diffuse *= 1.0f;
+  }
 
-//   RayHitObjectRecord lightHitRecord;
-//   // for each light source
-//   std::vector<glm::vec3> lightColorList;
-//   std::vector<float> lightDisList;
-//   std::vector<glm::vec3> lightDirList;
-//   for (vector<LightBase*>::iterator i = light.begin(); i != light.end(); i++) {
-//     lightColorList.clear();
-//     lightDisList.clear();
-//     lightDirList.clear();
-//     (*i)->GetLight(record.hitPoint, lightColorList, lightDisList, lightDirList);
+  glm::vec3 returnColor = glm::vec3(0);
+  returnColor += diffuse / (float)lightDirList.size() + specular;
+  //if (1 == level)
+  //  returnColor = glm::vec3(0, 0, 0);
 
-//     for (unsigned int j = 0; j < lightDirList.size(); j++) {
-//       Ray *lightRay = new Ray(record.hitPoint, lightDirList[j]);
-//       if (!RayHitTest(lightRay, scene, light, lightHitRecord, lightDisList[j])) {
-//         float diff = max(dot(record.hitNormal, lightDirList[j]), 0.0f);
-//         diffuse += diffuseStrength * diff * lightColorList[j];
-//       }
+  returnColor += reflectionColor;
 
-//       safe_delete(lightRay);
-//     }
-//   }
+  returnColor *= record.point_color;
 
-//   if (!hasHDRLighting)
-//     diffuse *= 15.0f;
-//   else
-//     diffuse *= 1.0f;
-
-//   glm::vec3 returnColor = glm::vec3(0);
-//   returnColor += diffuse / (float)lightDirList.size() + specular;
-//   //if (1 == level)
-//   //  returnColor = glm::vec3(0, 0, 0);
-
-//   returnColor += reflectionColor;
-
-//   returnColor *= record.pointColor;
-
-//   return returnColor;
-// }
+  return returnColor;
+}
 
 }

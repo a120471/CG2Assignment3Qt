@@ -25,7 +25,7 @@ RayTracingCamera::RayTracingCamera(
 }
 
 // row and col start from 0
-void RayTracingCamera::GenerateRay(int row, int col, std::vector<Ray*> &rays) {
+void RayTracingCamera::GenerateRay(int row, int col, std::vector<Ray> &rays) {
   if (!has_pixel_size_) {
     has_pixel_size_ = true;
     pixel_width_ = whf_.x / resolution_.x;
@@ -36,16 +36,15 @@ void RayTracingCamera::GenerateRay(int row, int col, std::vector<Ray*> &rays) {
   glm::vec3 rowOffset = glm::vec3(id_ * (row - (resolution_.y - 1.0f) / 2)) * pixel_height_;
   glm::vec3 ePoint = p_ + colOffset + rowOffset;
 
-  rays.resize(multi_samling_level_ * multi_samling_level_);
+  rays.clear();
   float step = 1.0f / (multi_samling_level_ + 1);
-  int loop = 0;
   for (int i = 1; i <= multi_samling_level_; ++i) {
     for (int j = 1; j <= multi_samling_level_; ++j) {
       glm::vec3 colOffsetLocal = glm::vec3(ir_ * (i * step - 0.5f)) * pixel_width_;
       glm::vec3 rowOffsetLocal = glm::vec3(id_ * (j * step - 0.5f)) * pixel_height_;
 
       glm::vec3 directionLocal = normalize(ePoint + colOffsetLocal + rowOffsetLocal - pos_);
-      rays[loop++] = new Ray(pos_, directionLocal);
+      rays.emplace_back(pos_, directionLocal);
     }
   }
 }

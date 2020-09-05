@@ -11,7 +11,7 @@ public:
   ~Ray() = default;
 
   // return a point on this ray
-  inline glm::vec3 GetPoint(float t) {
+  inline glm::vec3 GetPoint(float t) const {
     return s_point + direction * t;
   }
 
@@ -30,7 +30,7 @@ public:
   glm::vec3 getPos() {return pos_;}
   glm::vec3 getFront() {return front_;}
   glm::vec3 getUp() {return up_;}
-  void setCameraPos(glm::vec3 pos, glm::vec3 lookat, glm::vec3 up = glm::vec3(0, 1, 0))  {
+  void SetCameraPos(glm::vec3 pos, glm::vec3 lookat, glm::vec3 up = glm::vec3(0, 1, 0))  {
     pos_ = pos;
     front_ = normalize(lookat - pos_);
     up_ = normalize(up_);
@@ -48,7 +48,7 @@ public:
   int GetRayNumEachPixel();
 
   // compute the list of rays emit from pixel (i, j)
-  void GenerateRay(int row, int col, std::vector<Ray*> &rays);
+  void GenerateRay(int row, int col, std::vector<Ray> &rays);
 
 private:
   // camera location and orientation

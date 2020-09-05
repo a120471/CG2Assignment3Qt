@@ -9,25 +9,19 @@ const float MYINFINITE = 999999.f;
 
 const float MYEPSILON = 2e-4;
 
-// #ifndef COLORINTENSITYTHRES
-// #define COLORINTENSITYTHRES 2e4f
-// #endif // !COLORINTENSITYTHRES
+const float COLORINTENSITYTHRES = 2e4f;
 
 // #ifndef UNITAREASAMPLECOLOR
 // #define UNITAREASAMPLECOLOR (COLORINTENSITYTHRES / 10.0f)
 // #endif // !UNITAREASAMPLECOLOR
 
-// #ifndef NTHIDX
-// #define NTHIDX 85 / 100
-// #endif // !NTHIDX
+const float NTHIDX = 0.85f;
 
-// #ifndef MYTHREADNUM
-// #define MYTHREADNUM 8
-// #endif // !MYTHREADNUM
-
-// extern bool hasHDRLighting;
+const uint32_t MYTHREADNUM = 8u;
 
 namespace ray_tracing {
+
+extern bool hasHDRLighting;
 
 template<typename T> void SafeDelete(T *&p) {
   delete p;
@@ -55,72 +49,78 @@ void inline MySwap(T &t1, T &t2) {
 
 static void MergeBoundingBox(glm::vec3 &A, glm::vec3 &B,
   glm::vec3 A1, glm::vec3 B1, glm::vec3 A2, glm::vec3 B2) {
-  A[0] = glm::min(A1[0], A2[0]);
-  A[1] = glm::min(A1[1], A2[1]);
-  A[2] = glm::min(A1[2], A2[2]);
+  A[0] = std::min(A1[0], A2[0]);
+  A[1] = std::min(A1[1], A2[1]);
+  A[2] = std::min(A1[2], A2[2]);
 
-  B[0] = glm::max(B1[0], B2[0]);
-  B[1] = glm::max(B1[1], B2[1]);
-  B[2] = glm::max(B1[2], B2[2]);
+  B[0] = std::max(B1[0], B2[0]);
+  B[1] = std::max(B1[1], B2[1]);
+  B[2] = std::max(B1[2], B2[2]);
 }
 
 // Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-static bool RayHitAABB(Ray *ray, const glm::vec3 &A, const glm::vec3 &B) {
-  float abs_dx = abs(ray->direction.x);
-  float abs_dy = abs(ray->direction.y);
-  float abs_dz = abs(ray->direction.z);
+static bool RayHitAABB(const Ray &ray, const glm::vec3 &A, const glm::vec3 &B) {
+  float abs_dx = abs(ray.direction.x);
+  float abs_dy = abs(ray.direction.y);
+  float abs_dz = abs(ray.direction.z);
 
-  glm::vec3 A_RS = A - ray->s_point;
-  glm::vec3 B_RS = B - ray->s_point;
+  glm::vec3 A_RS = A - ray.s_point;
+  glm::vec3 B_RS = B - ray.s_point;
 
-  if (abs_dx < MYEPSILON && (SmallerThanEps(ray->s_point.x, A.x) || BiggerThanEps(ray->s_point.x, B.x)))
+  if (abs_dx < MYEPSILON && (SmallerThanEps(ray.s_point.x, A.x) || BiggerThanEps(ray.s_point.x, B.x))) {
     return false;
-  if (abs_dy < MYEPSILON && (SmallerThanEps(ray->s_point.y, A.y) || BiggerThanEps(ray->s_point.y, B.y)))
+  }
+  if (abs_dy < MYEPSILON && (SmallerThanEps(ray.s_point.y, A.y) || BiggerThanEps(ray.s_point.y, B.y))) {
     return false;
-  if (abs_dz < MYEPSILON && (SmallerThanEps(ray->s_point.z, A.z) || BiggerThanEps(ray->s_point.z, B.z)))
+  }
+  if (abs_dz < MYEPSILON && (SmallerThanEps(ray.s_point.z, A.z) || BiggerThanEps(ray.s_point.z, B.z))) {
     return false;
-
+  }
   float max_tmin = -MYINFINITE, min_tmax = MYINFINITE;
 
   bool valid = false;
   if (abs_dx > MYEPSILON) {
-    float t1 = A_RS.x / ray->direction.x;
-    float t2 = B_RS.x / ray->direction.x;
-    if (t1 > t2)
+    float t1 = A_RS.x / ray.direction.x;
+    float t2 = B_RS.x / ray.direction.x;
+    if (t1 > t2) {
       MySwap(t1, t2);
-
+    }
     max_tmin = std::max(max_tmin, t1);
     min_tmax = std::min(min_tmax, t2);
-    if (t2 > 0)
+    if (t2 > 0) {
       valid = true;
+    }
   }
   if (abs_dy > MYEPSILON) {
-    float t1 = A_RS.y / ray->direction.y;
-    float t2 = B_RS.y / ray->direction.y;
-    if (t1 > t2)
+    float t1 = A_RS.y / ray.direction.y;
+    float t2 = B_RS.y / ray.direction.y;
+    if (t1 > t2) {
       MySwap(t1, t2);
-
+    }
     max_tmin = std::max(max_tmin, t1);
     min_tmax = std::min(min_tmax, t2);
-    if (t2 > 0)
+    if (t2 > 0) {
       valid = true;
+    }
   }
   if (abs_dz > MYEPSILON) {
-    float t1 = A_RS.z / ray->direction.z;
-    float t2 = B_RS.z / ray->direction.z;
-    if (t1 > t2)
+    float t1 = A_RS.z / ray.direction.z;
+    float t2 = B_RS.z / ray.direction.z;
+    if (t1 > t2) {
       MySwap(t1, t2);
-
+    }
     max_tmin = std::max(max_tmin, t1);
     min_tmax = std::min(min_tmax, t2);
-    if (t2 > 0)
+    if (t2 > 0) {
       valid = true;
+    }
   }
 
-  if (max_tmin < min_tmax + MYEPSILON && valid)
+  if (max_tmin < min_tmax + MYEPSILON && valid) {
     return true;
-  else
+  } else {
     return false;
+  }
 }
 
 // this function is inefficient and not precise
