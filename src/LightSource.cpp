@@ -1,5 +1,4 @@
 #include "LightSource.h"
-#include <glm/geometric.hpp>
 #include "GeometryObject.h"
 
 namespace ray_tracing {
@@ -8,51 +7,50 @@ namespace ray_tracing {
 // #define STB_IMAGE_IMPLEMENTATION
 // #include <stb_image.h>
 
-// #include <glm/gtc/type_ptr.hpp>
 
 bool hasHDRLighting;
 
-PointLight::PointLight(const glm::vec3 &pos, const glm::vec3 &color)
+PointLight::PointLight(const Vec3f &pos, const Vec3f &color)
   : pos_(pos)
   , color_(color) {
 }
 
-void PointLight::GetLight(const glm::vec3 &s_point,
-  std::vector<glm::vec3> &colors,
+void PointLight::GetLight(const Vec3f &s_point,
+  std::vector<Vec3f> &colors,
   std::vector<float> &distances,
-  std::vector<glm::vec3> &light_dirs) {
+  std::vector<Vec3f> &light_dirs) {
   colors.emplace_back(color_);
-  distances.emplace_back(glm::distance(pos_, s_point));
-  light_dirs.emplace_back(glm::normalize(pos_ - s_point));
+  distances.emplace_back((pos_, s_point).norm());
+  light_dirs.emplace_back((pos_ - s_point).normalized());
 }
 
 void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  record.hit_point = glm::vec3(0, 0, 0);
-  record.hit_normal = glm::vec3(0, 0, 0);
-  record.r_direction = glm::vec3(0, 0, 0);
-  record.point_color = glm::vec3(0, 0, 0);
+  record.hit_point = Vec3f(0, 0, 0);
+  record.hit_normal = Vec3f(0, 0, 0);
+  record.r_direction = Vec3f(0, 0, 0);
+  record.point_color = Vec3f(0, 0, 0);
   record.depth = -1;
 }
 
 
-// AreaLight::AreaLight(glm::vec2 areaWH, glm::ivec2 resoWH, glm::vec3 pos, glm::vec3 totalColor, glm::vec3 dRight, glm::vec3 dDown)
+// AreaLight::AreaLight(Vec2f areaWH, Vec2i resoWH, Vec3f pos, Vec3f totalColor, Vec3f dRight, Vec3f dDown)
 //   : unitColor(totalColor / static_cast<float>(resoWH[0] * resoWH[1]))
 //   , pos(pos)
 //   , w(areaWH[0])
 //   , h(areaWH[1]) {
-//   normal = glm::normalize(glm::cross(dDown, dRight));
+//   normal = dDown.cross(dRight).normalized();
 
-//   float numF = totalColor.x / UNITAREASAMPLECOLOR;
-//   numF = std::max(numF, totalColor.y / UNITAREASAMPLECOLOR);
-//   numF = std::max(numF, totalColor.z / UNITAREASAMPLECOLOR);
+//   float numF = totalColor(0) / UNITAREASAMPLECOLOR;
+//   numF = std::max(numF, totalColor(1) / UNITAREASAMPLECOLOR);
+//   numF = std::max(numF, totalColor(2) / UNITAREASAMPLECOLOR);
 //   int num = static_cast<int>(numF);
 
-//   std::vector<glm::vec2> point;
+//   std::vector<Vec2f> point;
 //   BestCandidateAlgorithm(point, num, areaWH[0], areaWH[1]);
 
 //   for (int i = 0; i < num; ++i) {
-//     glm::vec3 pointPos;
-//     pointPos = pos + dRight * point[i].x + dDown * point[i].y;
+//     Vec3f pointPos;
+//     pointPos = pos + dRight * point[i](0) + dDown * point[i](1);
 //     pointSamples.emplace_back(new PointLight(pointPos, unitColor / (float)num));
 //   }
 // }
@@ -61,20 +59,20 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //     SafeDelete(*i);
 //   }
 // }
-// void AreaLight::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, std::vector<float> &disList, std::vector<glm::vec3> &lightDirList) {
+// void AreaLight::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
 //   for (int i = 0; i < pointSamples.size(); ++i) {
 //     pointSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
 //   }
 // }
 // void AreaLight::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-//   rhor.hit_point = glm::vec3(0, 0, 0);
-//   rhor.hit_normal = glm::vec3(0, 0, 0);
-//   rhor.r_direction = glm::vec3(0, 0, 0);
-//   rhor.point_color = glm::vec3(0, 0, 0);
+//   rhor.hit_point = Vec3f(0, 0, 0);
+//   rhor.hit_normal = Vec3f(0, 0, 0);
+//   rhor.r_direction = Vec3f(0, 0, 0);
+//   rhor.point_color = Vec3f(0, 0, 0);
 //   rhor.depth = -1;
 // }
 
-// SquareMap::SquareMap(glm::vec3 **data, int n, glm::vec3 ulCorner, glm::vec3 dRight, glm::vec3 dDown, float size)
+// SquareMap::SquareMap(Vec3f **data, int n, Vec3f ulCorner, Vec3f dRight, Vec3f dDown, float size)
 //   : data(data)
 //   , n(n)
 //   , ulCorner(ulCorner)
@@ -82,13 +80,13 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   , dDown(dDown)
 //   , size(size)
 //   , quadT(NULL) {
-//   this->normal = normalize(cross(dDown, dRight));
-//   this->D = -dot(ulCorner, normal);
+//   this->normal = dDown.cross(dRight).normalized();
+//   this->D = -ulCorner.dot(normal);
 
 //   this->quadT = new QuadTree(data, n, size);
 
 //   for (unsigned int i = 0; i < quadT->areaColor.size(); ++i) {
-//     glm::vec3 pos;
+//     Vec3f pos;
 //     pos = ulCorner + (dRight * (float)quadT->posRC[i][1] + dDown * (float)quadT->posRC[i][0]) * (size / n);
 //     this->lightSamples.emplace_back(new AreaLight(quadT->sizeWH[i], quadT->resoWH[i], pos, quadT->areaColor[i], dRight, dDown));
 //   }
@@ -106,25 +104,25 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   }
 //   SafeDelete(quadT);
 // }
-// void SquareMap::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, std::vector<float> &disList, std::vector<glm::vec3> &lightDirList) {
+// void SquareMap::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
 //   for (unsigned int i = 0; i < this->lightSamples.size(); ++i) {
 //     this->lightSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
 //   }
 // }
 // void SquareMap::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-//   glm::vec3 sp = ray.sPoint;
-//   glm::vec3 d = ray.direction;
+//   Vec3f sp = ray.sPoint;
+//   Vec3f d = ray.direction;
 
-//   float denominator = dot(this->normal, d);
-//   float numerator = -this->D - dot(this->normal, sp);
+//   float denominator = this->normal.dot(d);
+//   float numerator = -this->D - this->normal.dot(sp);
 
 //   float t = numerator / denominator;
 //   while (t > MYEPSILON) {
-//     glm::vec3 hit_point = ray.getPoint(t);
+//     Vec3f hit_point = ray.getPoint(t);
 //     for (int i = 0; i < 4; ++i) {
-//       glm::vec3 &e = glm::vec3();
-//       glm::vec3 n;
-//       glm::vec3 &n_ = glm::vec3();
+//       Vec3f &e = Vec3f();
+//       Vec3f n;
+//       Vec3f &n_ = Vec3f();
 
 //       switch (i) {
 //       case 0:
@@ -144,13 +142,13 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //         n_ = hit_point - ulCorner - dRight * size;
 //         break;
 //       }
-//       n = cross(this->normal, e);
+//       n = this->normal.cross(e);
 
-//       if (dot(n, n_) < 0) {
-//         rhor.hit_point = glm::vec3(0, 0, 0);
-//         rhor.hit_normal = glm::vec3(0, 0, 0);
-//         rhor.r_direction = glm::vec3(0, 0, 0);
-//         rhor.point_color = glm::vec3(0, 0, 0);
+//       if (n.dot(n_) < 0) {
+//         rhor.hit_point = Vec3f(0, 0, 0);
+//         rhor.hit_normal = Vec3f(0, 0, 0);
+//         rhor.r_direction = Vec3f(0, 0, 0);
+//         rhor.point_color = Vec3f(0, 0, 0);
 //         rhor.depth = -1;
 //         return;
 //       }
@@ -158,10 +156,10 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 
 //     rhor.hit_point = ray.getPoint(t);
 //     rhor.hit_normal = this->normal;
-//     rhor.r_direction = ray.direction - 2 * dot(ray.direction, rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+//     rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
 
-//     float wCoord = dot((rhor.hit_point - ulCorner), dRight) / size * n;
-//     float hCoord = dot((rhor.hit_point - ulCorner), dDown) / size * n;
+//     float wCoord = (rhor.hit_point - ulCorner).dot(dRight) / size * n;
+//     float hCoord = (rhor.hit_point - ulCorner).dot(dDown) / size * n;
 
 //     if ((int)wCoord < 0) wCoord = 0.0f;
 //     if ((int)wCoord >= n - 2) wCoord = (float)(n - 2);
@@ -173,7 +171,7 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //     float wh1 = hCoord - floor(hCoord);
 //     float wh2 = 1.0f - wh1;
 
-//     glm::vec3 color = data[(int)hCoord][(int)wCoord] * ww2 * wh2 +
+//     Vec3f color = data[(int)hCoord][(int)wCoord] * ww2 * wh2 +
 //       data[(int)hCoord][(int)wCoord + 1] * ww1 * wh2 +
 //       data[(int)hCoord + 1][(int)wCoord] * ww2 * wh1 +
 //       data[(int)hCoord + 1][(int)wCoord + 1] * ww1 * wh1;
@@ -183,10 +181,10 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //     return;
 //   }
 
-//   rhor.hit_point = glm::vec3(0, 0, 0);
-//   rhor.hit_normal = glm::vec3(0, 0, 0);
-//   rhor.r_direction = glm::vec3(0, 0, 0);
-//   rhor.point_color = glm::vec3(0, 0, 0);
+//   rhor.hit_point = Vec3f(0, 0, 0);
+//   rhor.hit_normal = Vec3f(0, 0, 0);
+//   rhor.r_direction = Vec3f(0, 0, 0);
+//   rhor.point_color = Vec3f(0, 0, 0);
 //   rhor.depth = -1;
 // }
 
@@ -225,9 +223,9 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   SafeDelete(backward);
 // }
 // void CubeMap::ExtractSquareMap(SquareMap *&sm, int idx, int rowIdx, int colIdx, bool rowInverse, bool colInverse, float size) {
-//   glm::vec3 **area = new glm::vec3*[N];
+//   Vec3f **area = new Vec3f*[N];
 //   for (int i = 0; i < N; ++i)
-//     area[i] = new glm::vec3[N];
+//     area[i] = new Vec3f[N];
 //   // do not delete area, we delete it in ~SquareMap()
 
 //   int rI, imageI;
@@ -237,14 +235,14 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //     if (!colInverse) {
 //       imageI = rI + colIdx * N * dimension;
 //       for (int c = 0; c < N; ++c) {
-//         area[r][c] = glm::vec3(loadImage[imageI], loadImage[imageI + 1], loadImage[imageI + 2]);
+//         area[r][c] = Vec3f(loadImage[imageI], loadImage[imageI + 1], loadImage[imageI + 2]);
 //         imageI += 3;
 //       }
 //     }
 //     else {
 //       imageI = rI + (colIdx + 1) * N * dimension - 1;
 //       for (int c = 0; c < N; ++c) {
-//         area[r][c] = glm::vec3(loadImage[imageI - 2], loadImage[imageI - 1], loadImage[imageI]);
+//         area[r][c] = Vec3f(loadImage[imageI - 2], loadImage[imageI - 1], loadImage[imageI]);
 //         imageI -= 3;
 //       }
 //     }
@@ -253,44 +251,44 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   }
 
 //   // to calculate area light's pos
-//   glm::vec3 ulCorner, dR, dD;
+//   Vec3f ulCorner, dR, dD;
 //   float size_2 = size / 2.0f;
 //   switch (idx) {
 //   case 0: // top
-//     ulCorner = glm::vec3(-size_2, size_2, size_2);
-//     dR = glm::vec3(1, 0, 0);
-//     dD = glm::vec3(0, 0, -1);
+//     ulCorner = Vec3f(-size_2, size_2, size_2);
+//     dR = Vec3f(1, 0, 0);
+//     dD = Vec3f(0, 0, -1);
 //     break;
 //   case 1: // bottom
-//     ulCorner = glm::vec3(-size_2, -size_2, -size_2);
-//     dR = glm::vec3(1, 0, 0);
-//     dD = glm::vec3(0, 0, 1);
+//     ulCorner = Vec3f(-size_2, -size_2, -size_2);
+//     dR = Vec3f(1, 0, 0);
+//     dD = Vec3f(0, 0, 1);
 //     break;
 //   case 2: // left
-//     ulCorner = glm::vec3(-size_2, size_2, size_2);
-//     dR = glm::vec3(0, 0, -1);
-//     dD = glm::vec3(0, -1, 0);
+//     ulCorner = Vec3f(-size_2, size_2, size_2);
+//     dR = Vec3f(0, 0, -1);
+//     dD = Vec3f(0, -1, 0);
 //     break;
 //   case 3: // right
-//     ulCorner = glm::vec3(size_2, size_2, -size_2);
-//     dR = glm::vec3(0, 0, 1);
-//     dD = glm::vec3(0, -1, 0);
+//     ulCorner = Vec3f(size_2, size_2, -size_2);
+//     dR = Vec3f(0, 0, 1);
+//     dD = Vec3f(0, -1, 0);
 //     break;
 //   case 4: // forward
-//     ulCorner = glm::vec3(-size_2, size_2, -size_2);
-//     dR = glm::vec3(1, 0, 0);
-//     dD = glm::vec3(0, -1, 0);
+//     ulCorner = Vec3f(-size_2, size_2, -size_2);
+//     dR = Vec3f(1, 0, 0);
+//     dD = Vec3f(0, -1, 0);
 //     break;
 //   case 5: // backward
-//     ulCorner = glm::vec3(size_2, size_2, size_2);
-//     dR = glm::vec3(-1, 0, 0);
-//     dD = glm::vec3(0, -1, 0);
+//     ulCorner = Vec3f(size_2, size_2, size_2);
+//     dR = Vec3f(-1, 0, 0);
+//     dD = Vec3f(0, -1, 0);
 //     break;
 //   }
 
 //   sm = new SquareMap(area, N, ulCorner, dR, dD, size);
 // }
-// void CubeMap::GetLight(glm::vec3 sPoint, std::vector<glm::vec3> &colorList, std::vector<float> &disList, std::vector<glm::vec3> &lightDirList) {
+// void CubeMap::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
 //   this->top->GetLight(sPoint, colorList, disList, lightDirList);
 //   // this->bottom->GetLight(sPoint, colorList, disList, lightDirList);
 //   this->left->GetLight(sPoint, colorList, disList, lightDirList);

@@ -2,31 +2,32 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <Eigen/Geometry>
 #include "Utils.h"
 
 namespace ray_tracing {
 
 GeometryObject::GeometryObject(const std::string &typeName,
-  const glm::vec3 &color)
+  const Vec3f &color)
   : typeName_(typeName)
   , color_(color) {
 }
 
-Sphere::Sphere(const glm::vec3 &center, float radius, const glm::vec3 &color)
+Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   : GeometryObject("sphere", color)
   , center_(center)
   , radius_(radius) {
-  AA_ = center_ - radius_;
-  BB_ = center_ + radius_;
+  AA_ = center_ - Vec3f::Ones() * radius_;
+  BB_ = center_ + Vec3f::Ones() * radius_;
 }
 void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-  glm::vec3 sc = ray.s_point - center_;
-  glm::vec3 d = ray.direction;
+  Vec3f sc = ray.s_point - center_;
+  Vec3f d = ray.direction;
 
   // At^2 + Bt + C = 0, solve t
-  float A = dot(d, d);
-  float B = 2 * dot(d, sc);
-  float C = dot(sc, sc) - radius_*radius_;
+  float A = d.squaredNorm();
+  float B = 2 * d.dot(sc);
+  float C = sc.squaredNorm() - radius_*radius_;
 
   float det = B*B - 4 * A*C;
   if (det > MYEPSILON) {
@@ -35,70 +36,70 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
 
     if (t1 > MYEPSILON) {
       rhor.hit_point = ray.GetPoint(t1);
-      rhor.hit_normal = normalize(rhor.hit_point - center_);
-      rhor.r_direction = ray.direction - 2 * dot(ray.direction, rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+      rhor.hit_normal = (rhor.hit_point - center_).normalized();
+      rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
       rhor.point_color = color_;
       rhor.depth = t1;
       return;
     }
     else if (t2 > MYEPSILON) {
       rhor.hit_point = ray.GetPoint(t2);
-      rhor.hit_normal = normalize(rhor.hit_point - center_);
-      rhor.r_direction = ray.direction - 2 * dot(ray.direction, rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+      rhor.hit_normal = (rhor.hit_point - center_).normalized();
+      rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
       rhor.point_color = color_;
       rhor.depth = t2;
       return;
     }
   }
 
-  rhor.hit_point = glm::vec3(0, 0, 0);
-  rhor.hit_normal = glm::vec3(0, 0, 0);
-  rhor.r_direction = glm::vec3(0, 0, 0);
-  rhor.point_color = glm::vec3(0, 0, 0);
+  rhor.hit_point = Vec3f(0, 0, 0);
+  rhor.hit_normal = Vec3f(0, 0, 0);
+  rhor.r_direction = Vec3f(0, 0, 0);
+  rhor.point_color = Vec3f(0, 0, 0);
   rhor.depth = -1;
 }
-void Sphere::GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) {
+void Sphere::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
   AA = AA;
   BB = BB;
 }
 
 
-Plane::Plane(const glm::vec4 &ABCD, const glm::vec3 &color)
+Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   : GeometryObject("plane", color)
   , ABCD_(ABCD)
-  , normal_(normalize(glm::vec3(ABCD))) {
-  AA_ = glm::vec3(-MYINFINITE);
-  BB_ = glm::vec3(MYINFINITE);
+  , normal_(ABCD.head<3>().normalized()) {
+  AA_ = Vec3f::Ones() * -MYINFINITE;
+  BB_ = Vec3f::Ones() * MYINFINITE;
 }
 void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-  glm::vec3 sp = ray.s_point;
-  glm::vec3 d = ray.direction;
+  Vec3f sp = ray.s_point;
+  Vec3f d = ray.direction;
 
-  float denominator = dot(glm::vec3(ABCD_), d);
-  float numerator = -ABCD_[3] - dot(glm::vec3(ABCD_), sp);
+  float denominator = ABCD_.head<3>().dot(d);
+  float numerator = -ABCD_[3] - ABCD_.head<3>().dot(sp);
 
   float t = numerator / denominator;
   if (t > MYEPSILON) {
     rhor.hit_point = ray.GetPoint(t);
     rhor.hit_normal = normal_;
-    rhor.r_direction = ray.direction - 2 * dot(ray.direction, rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+    rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
     rhor.point_color = color_;
     rhor.depth = t;
     return;
   }
 
-  rhor.hit_point = glm::vec3(0, 0, 0);
-  rhor.hit_normal = glm::vec3(0, 0, 0);
-  rhor.r_direction = glm::vec3(0, 0, 0);
-  rhor.point_color = glm::vec3(0, 0, 0);
+  rhor.hit_point = Vec3f(0, 0, 0);
+  rhor.hit_normal = Vec3f(0, 0, 0);
+  rhor.r_direction = Vec3f(0, 0, 0);
+  rhor.point_color = Vec3f(0, 0, 0);
   rhor.depth = -1;
 }
-void Plane::GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) {
+void Plane::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
   AA = AA;
   BB = BB;
 }
 
-Triangle::Triangle(const Vertex &A, const Vertex &B, const Vertex &C, glm::vec3 color)
+Triangle::Triangle(const Vertex &A, const Vertex &B, const Vertex &C, Vec3f color)
   : GeometryObject("triangle", color)
   , A_(A)
   , B_(B)
@@ -116,36 +117,36 @@ Triangle::Triangle(const Vertex &A, const Vertex &B, const Vertex &C, glm::vec3 
   eAC_ = C_.Position - A_.Position;
 }
 void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-  glm::vec3 s = ray.s_point - A_.Position;
-  glm::vec3 d = ray.direction;
+  Vec3f s = ray.s_point - A_.Position;
+  Vec3f d = ray.direction;
 
-  float denominator = dot(cross(d, eAC_), eAB_);
+  float denominator = d.cross(eAC_).dot(eAB_);
 
-  float b1 = dot(cross(d, eAC_), s) / denominator;
-  float b2 = dot(cross(eAB_, d), s) / denominator;
-  float t = dot(cross(eAB_, eAC_), s) / denominator;
+  float b1 = d.cross(eAC_).dot(s) / denominator;
+  float b2 = eAB_.cross(d).dot(s) / denominator;
+  float t = eAB_.cross(eAC_).dot(s) / denominator;
   if (t > MYEPSILON && b1 > -MYEPSILON && b2 > -MYEPSILON && b1 + b2 < 1 + MYEPSILON) {
     rhor.hit_point = ray.GetPoint(t);
-    rhor.hit_normal = normalize((1 - b1 - b2) * A_.Normal + b1 * B_.Normal + b2 * C_.Normal);
-    //rhor.hit_normal = normalize(cross(eAB_, eAC_));
-    rhor.r_direction = ray.direction - 2 * dot(ray.direction, rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+    rhor.hit_normal = ((1 - b1 - b2) * A_.Normal + b1 * B_.Normal + b2 * C_.Normal).normalized();
+    //rhor.hit_normal = eAB_.cross(eAC_).normalized();
+    rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
     rhor.point_color = color_;
     rhor.depth = t;
     return;
   }
 
-  rhor.hit_point = glm::vec3(0, 0, 0);
-  rhor.hit_normal = glm::vec3(0, 0, 0);
-  rhor.r_direction = glm::vec3(0, 0, 0);
-  rhor.point_color = glm::vec3(0, 0, 0);
+  rhor.hit_point = Vec3f(0, 0, 0);
+  rhor.hit_normal = Vec3f(0, 0, 0);
+  rhor.r_direction = Vec3f(0, 0, 0);
+  rhor.point_color = Vec3f(0, 0, 0);
   rhor.depth = -1;
 }
-void Triangle::GetBoundingBox(glm::vec3 &AA, glm::vec3 &BB) {
+void Triangle::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
   AA = AA;
   BB = BB;
 }
 
-Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices, const std::vector<int> &faces, const glm::vec3 &color)
+Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices, const std::vector<int> &faces, const Vec3f &color)
   : GeometryObject("Mesh", color)
   , sKDT_(nullptr) {
   faceTriangles_.clear();
@@ -183,7 +184,7 @@ void Mesh::HitTree(const Ray &ray, KDTree::TreeNode* node, RayHitObjectRecord &r
   }
 }
 
-Model::Model(const std::string &modelPath, const glm::vec3 &color)
+Model::Model(const std::string &modelPath, const Vec3f &color)
   : GeometryObject("Model", color) {
   srand(time(0));
 
@@ -233,16 +234,16 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene) {
     Triangle::Vertex vertex;
     // Process vertex positions, normals and texture coordinates
 
-    glm::vec3 vector;
+    Vec3f vector;
     // Positions
-    vector.x = mesh->mVertices[i].x;
-    vector.y = mesh->mVertices[i].y;
-    vector.z = mesh->mVertices[i].z;
+    vector << mesh->mVertices[i].x,
+      mesh->mVertices[i].y,
+      mesh->mVertices[i].z;
     vertex.Position = vector;
     // Normals
-    vector.x = mesh->mNormals[i].x;
-    vector.y = mesh->mNormals[i].y;
-    vector.z = mesh->mNormals[i].z;
+    vector << mesh->mNormals[i].x,
+      mesh->mNormals[i].y,
+      mesh->mNormals[i].z;
     vertex.Normal = vector;
 
     vertices[i] = vertex;
@@ -258,7 +259,7 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene) {
   }
 
   //return new Mesh(vertices, faces, color);
-  return new Mesh(vertices, faces, glm::vec3(static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX));
+  return new Mesh(vertices, faces, Vec3f(static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX));
 }
 
 }

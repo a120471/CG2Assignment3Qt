@@ -1,50 +1,50 @@
 #pragma once
 
 #include <vector>
-#include <glm/gtc/type_ptr.hpp>
+#include "Type.h"
 
 namespace ray_tracing {
 
 class Ray {
 public:
-  Ray(const glm::vec3 &origin_point, const glm::vec3 &dir);
+  Ray(const Vec3f &origin_point, const Vec3f &dir);
   ~Ray() = default;
 
   // return a point on this ray
-  inline glm::vec3 GetPoint(float t) const {
+  inline Vec3f GetPoint(float t) const {
     return s_point + direction * t;
   }
 
-  glm::vec3 s_point;
-  glm::vec3 direction;
+  Vec3f s_point;
+  Vec3f direction;
 };
 
 class RayTracingCamera {
 public:
-  RayTracingCamera(const glm::vec3 &pos = glm::vec3(0, 0, 0),
-    const glm::vec3 &lookat = glm::vec3(0, 0, -1),
-    const glm::vec3 &up = glm::vec3(0, 1, 0),
+  RayTracingCamera(const Vec3f &pos = Vec3f::Zero(),
+    const Vec3f &lookat = Vec3f(0.f, 0.f, -1.f),
+    const Vec3f &up = Vec3f(0.f, 1.f, 0.f),
     int multi_sampling = 1);
   ~RayTracingCamera() = default;
 
-  glm::vec3 getPos() {return pos_;}
-  glm::vec3 getFront() {return front_;}
-  glm::vec3 getUp() {return up_;}
-  void SetCameraPos(glm::vec3 pos, glm::vec3 lookat, glm::vec3 up = glm::vec3(0, 1, 0))  {
+  Vec3f getPos() {return pos_;}
+  Vec3f getFront() {return front_;}
+  Vec3f getUp() {return up_;}
+  void SetCameraPos(Vec3f pos, Vec3f lookat, Vec3f up = Vec3f(0, 1, 0))  {
     pos_ = pos;
-    front_ = normalize(lookat - pos_);
-    up_ = normalize(up_);
+    front_ = (lookat - pos_).normalized();
+    up_ = (up_).normalized();
 
-    ir_ = normalize(cross(front_, up_));
-    id_ = normalize(cross(front_, ir_));
+    ir_ = front_.cross(up_).normalized();
+    id_ = front_.cross(ir_).normalized();
   }
 
-  const glm::uvec2 &GetResolution();
-  void SetResolution(const glm::uvec2 &resolution);
-  const glm::vec3 &GetWHF();
-  void SetWHF(const glm::vec3 &whf);
-  glm::vec3 GetP() {return p_;}
-  void SetP(glm::vec3 p) {p_ = p;}
+  const Vec2u &GetResolution();
+  void SetResolution(const Vec2u &resolution);
+  const Vec3f &GetWHF();
+  void SetWHF(const Vec3f &whf);
+  Vec3f GetP() {return p_;}
+  void SetP(Vec3f p) {p_ = p;}
   int GetRayNumEachPixel();
 
   // compute the list of rays emit from pixel (i, j)
@@ -52,16 +52,16 @@ public:
 
 private:
   // camera location and orientation
-  glm::vec3 pos_, front_, up_;
+  Vec3f pos_, front_, up_;
   // number of pixels
-  glm::uvec2 resolution_;
+  Vec2u resolution_;
   // image width, image height, local length
-  glm::vec3 whf_;
+  Vec3f whf_;
   // image center position
-  glm::vec3 p_;
+  Vec3f p_;
 
   // image right direction, image down direction
-  glm::vec3 ir_, id_;
+  Vec3f ir_, id_;
   bool has_pixel_size_ = false;
   float pixel_width_, pixel_height_;
 

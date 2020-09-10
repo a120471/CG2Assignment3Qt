@@ -1,24 +1,24 @@
 #pragma once
 
 #include <vector>
-#include <glm/gtc/type_ptr.hpp>
+#include "Type.h"
 
 namespace ray_tracing {
 
 class QuadTree {
 public:
-  QuadTree(glm::vec3 **data, int n, float size);
+  QuadTree(Vec3f **data, int n, float size);
   ~QuadTree();
 
-  std::vector<glm::ivec2> posRC;
-  std::vector<glm::vec2> sizeWH;
-  std::vector<glm::ivec2> resoWH;
-  std::vector<glm::vec3> areaColor;
+  std::vector<Vec2i> posRC;
+  std::vector<Vec2f> sizeWH;
+  std::vector<Vec2i> resoWH;
+  std::vector<Vec3f> areaColor;
 
 private:
   void BuildQTree(int sR, int sC, int n);
 
-  glm::dvec3 **sumMatrix;
+  Vec3d **sumMatrix;
   int N;
   float unitSize;
 };

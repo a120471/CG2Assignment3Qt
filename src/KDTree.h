@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <glm/gtc/type_ptr.hpp>
+#include "Type.h"
 
 namespace ray_tracing {
 
@@ -10,15 +10,15 @@ class Triangle;
 class KDTree {
 public:
   struct TreeNode {
-    TreeNode() {
+  TreeNode() {
       lChild = nullptr;
       rChild = nullptr;
       triangleIdx.clear();
     }
 
     // bounding box
-    glm::vec3 AA; // min corner
-    glm::vec3 BB; // max corner
+    Vec3f AA; // min corner
+    Vec3f BB; // max corner
 
     TreeNode *lChild, *rChild;
     std::vector<int> triangleIdx;

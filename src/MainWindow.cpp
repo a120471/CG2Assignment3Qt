@@ -10,19 +10,17 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QTextStream>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
 #include "LightSource.h"
 #include "GeometryObject.h"
 #include "RayTracingCamera.h"
 #include "Utils.h"
 
-const glm::uvec2 RESOLUTION = glm::uvec2(400u, 300u);
+const std::vector<uint32_t> RESOLUTION{400u, 300u};
 const uint32_t MULTI_SAMPLING = 1u;
 const uint32_t IMAGE_SCALE_RATIO = 3u;
-const glm::vec3 CAMERA_POS = glm::vec3(0, 1, 10);
-const glm::vec3 LOOKAT = glm::vec3(0, 0, 0);
-const QString SCENE_FILE_PATH = QString("");
+const std::vector<float> CAMERA_POS{0.f, 1.f, 10.f};
+const std::vector<float> LOOKAT{0.f, 0.f, 0.f};
+const QString SCENE_FILE_PATH = QString("/home/dushuai/GitProject/CG2Assignment3Qt/resources/scene.txt");
 
 namespace {
 
@@ -30,12 +28,12 @@ using namespace ray_tracing;
 
 std::mutex mutex;
 
-glm::vec3 QStringListToGlmVec3(const QStringList &list) {
-  return glm::vec3(list[0].toFloat(), list[1].toFloat(), list[2].toFloat());
+Vec3f QStringListToVec3f(const QStringList &list) {
+  return Vec3f(list[0].toFloat(), list[1].toFloat(), list[2].toFloat());
 }
 
-glm::vec4 QStringListToGlmVec4(const QStringList &list) {
-  return glm::vec4(list[0].toFloat(), list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
+Vec4f QStringListToVec4f(const QStringList &list) {
+  return Vec4f(list[0].toFloat(), list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
 }
 
 void ParseSceneLineData(std::vector<std::shared_ptr<GeometryObject>> &scene, const QString &line) {
@@ -46,27 +44,27 @@ void ParseSceneLineData(std::vector<std::shared_ptr<GeometryObject>> &scene, con
     QString geometry_type = level1[0].toLower();
     if (geometry_type == "sphere") {
       level2 = level1[1].split(',');
-      glm::vec3 center = QStringListToGlmVec3(level2);
+      Vec3f center = QStringListToVec3f(level2);
 
       float radius = level1[2].toFloat();
 
       level2 = level1[3].split(',');
-      glm::vec3 color = QStringListToGlmVec3(level2);
+      Vec3f color = QStringListToVec3f(level2);
 
       scene.emplace_back(std::make_shared<Sphere>(center, radius, color));
     } else if (geometry_type == "plane") {
       level2 = level1[1].split(',');
-      glm::vec4 ABCD = QStringListToGlmVec4(level2);
+      Vec4f ABCD = QStringListToVec4f(level2);
 
       level2 = level1[2].split(',');
-      glm::vec3 color = QStringListToGlmVec3(level2);
+      Vec3f color = QStringListToVec3f(level2);
 
       scene.emplace_back(std::make_shared<Plane>(ABCD, color));
     } else if (geometry_type == "model") {
       std::string filepath = level1[1].toStdString();
 
       level2 = level1[2].split(',');
-      glm::vec3 color = QStringListToGlmVec3(level2);
+      Vec3f color = QStringListToVec3f(level2);
 
       scene.emplace_back(std::make_shared<Model>(filepath, color));
     }
@@ -87,7 +85,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 void MainWindow::InitUI() {
-  this->setWindowTitle("Ray Tracing");
+  this->setWindowTitle("Ray Tracing Program");
 
   auto central_widget = new QWidget(this);
   this->setCentralWidget(central_widget);
@@ -99,50 +97,23 @@ void MainWindow::InitUI() {
 
   auto right_layout = new QFormLayout();
   layout->addLayout(right_layout);
-  auto resolution = new QHBoxLayout();
-  right_layout->addRow("Resolution", resolution);
-  auto image_w = new QLineEdit(QString::number(RESOLUTION.x), this);
-  auto image_h = new QLineEdit(QString::number(RESOLUTION.y), this);
-  resolution->addWidget(image_w);
-  resolution->addWidget(image_h);
-  resolution_vec_.clear();
-  resolution_vec_.emplace_back(image_w);
-  resolution_vec_.emplace_back(image_h);
+  resolution_ = new VectorWidget(RESOLUTION, this);
+  right_layout->addRow("Resolution", resolution_);
 
-  multi_sampling_ = new QLineEdit(QString::number(MULTI_SAMPLING), this);
+  multi_sampling_ = new NumberWidget(MULTI_SAMPLING, this);
   right_layout->addRow("Multi Sampling", multi_sampling_);
 
-  scale_ratio_ = new QLineEdit(QString::number(IMAGE_SCALE_RATIO), this);
+  scale_ratio_ = new NumberWidget(IMAGE_SCALE_RATIO, this);
   right_layout->addRow("Image Scale Ratio", scale_ratio_);
 
   auto spacer1 = new QSpacerItem(20, 20);
   right_layout->addItem(spacer1);
 
-  auto camera_pos = new QHBoxLayout();
-  right_layout->addRow("Camera Pos", camera_pos);
-  auto cam_x = new QLineEdit(QString::number(CAMERA_POS.x), this);
-  auto cam_y = new QLineEdit(QString::number(CAMERA_POS.y), this);
-  auto cam_z = new QLineEdit(QString::number(CAMERA_POS.z), this);
-  camera_pos->addWidget(cam_x);
-  camera_pos->addWidget(cam_y);
-  camera_pos->addWidget(cam_z);
-  cam_pos_vec_.clear();
-  cam_pos_vec_.emplace_back(cam_x);
-  cam_pos_vec_.emplace_back(cam_y);
-  cam_pos_vec_.emplace_back(cam_z);
+  cam_pos_vec_ = new VectorWidget(CAMERA_POS, this);
+  right_layout->addRow("Camera Pos", cam_pos_vec_);
 
-  auto lookat = new QHBoxLayout();
-  right_layout->addRow("Lookat", lookat);
-  auto lookat_x = new QLineEdit(QString::number(LOOKAT.x), this);
-  auto lookat_y = new QLineEdit(QString::number(LOOKAT.y), this);
-  auto lookat_z = new QLineEdit(QString::number(LOOKAT.z), this);
-  lookat->addWidget(lookat_x);
-  lookat->addWidget(lookat_y);
-  lookat->addWidget(lookat_z);
-  cam_lookat_vec_.clear();
-  cam_lookat_vec_.emplace_back(lookat_x);
-  cam_lookat_vec_.emplace_back(lookat_y);
-  cam_lookat_vec_.emplace_back(lookat_z);
+  cam_lookat_vec_ = new VectorWidget(LOOKAT, this);
+  right_layout->addRow("Lookat", cam_lookat_vec_);
 
   auto spacer2 = new QSpacerItem(20, 20);
   right_layout->addItem(spacer2);
@@ -180,9 +151,9 @@ void MainWindow::RenderScene() {
   // Create lights
   std::vector<std::shared_ptr<LightBase>> lights;
   lights.emplace_back(std::make_shared<PointLight>(
-    glm::vec3(1.3, 0, 1), glm::vec3(1, 1, 1) * 0.7f));
+    Vec3f(1.3, 0, 1), Vec3f(1, 1, 1) * 0.7f));
   lights.emplace_back(std::make_shared<PointLight>(
-    glm::vec3(-1.1, 1, 0.5), glm::vec3(0.4, 0.6, 0.5) * 1.0f));
+    Vec3f(-1.1, 1, 0.5), Vec3f(0.4, 0.6, 0.5) * 1.0f));
   // lights.emplace_back((LightBase*)new CubeMap("../cubeMap.hdr", 30.1f));
 
   // Create scene
@@ -201,22 +172,17 @@ void MainWindow::RenderScene() {
   scene_file.close();
 
   // Create camera
-  glm::vec3 cam_pos(cam_pos_vec_[0]->text().toFloat(),
-    cam_pos_vec_[1]->text().toFloat(),
-    cam_pos_vec_[2]->text().toFloat());
-  glm::vec3 lookat(cam_lookat_vec_[0]->text().toFloat(),
-    cam_lookat_vec_[1]->text().toFloat(),
-    cam_lookat_vec_[2]->text().toFloat());
+  Vec3f cam_pos = cam_pos_vec_->GetValue();
+  Vec3f lookat = cam_lookat_vec_->GetValue();
   RenderParams params;
-  params.resolution = glm::uvec2(resolution_vec_[0]->text().toUInt(),
-    resolution_vec_[1]->text().toUInt());
-  params.multi_sampling = multi_sampling_->text().toInt();
-  params.image_scale_ratio = scale_ratio_->text().toInt();
+  params.resolution = resolution_->GetValue();
+  params.multi_sampling = multi_sampling_->GetValue();
+  params.image_scale_ratio = scale_ratio_->GetValue();
   auto camera = std::make_shared<RayTracingCamera>(
-    cam_pos, lookat, glm::vec3(0, 1, 0), params.multi_sampling);
+    cam_pos, lookat, Vec3f(0, 1, 0), params.multi_sampling);
   camera->SetResolution(params.resolution); // pixel resolution
-  camera->SetWHF(glm::vec3(8, 6, 8));  // help to set image center?
-  camera->SetP(camera->getPos() + camera->getFront() * camera->GetWHF().z);
+  camera->SetWHF(Vec3f(8, 6, 8));  // help to set image center?
+  camera->SetP(camera->getPos() + camera->getFront() * camera->GetWHF()(2));
 
   // render image
   render_button_->setEnabled(false);
@@ -227,7 +193,7 @@ void MainWindow::RenderScene() {
 
 void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
   int pixel_id, uint32_t resolution_w,
-  std::vector<glm::vec3> &pixel_list,
+  std::vector<Vec3f> &pixel_list,
   const std::vector<std::shared_ptr<GeometryObject>> &scene,
   const std::vector<std::shared_ptr<LightBase>> &lights) {
 
@@ -238,7 +204,7 @@ void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
 
   // for each ray inside a pixel
   RayHitObjectRecord record;
-  pixel_list[pixel_id] = glm::vec3();
+  pixel_list[pixel_id] = Vec3f();
   for (const auto &ray : rays) {
     // find the hit object and hit type
     int hitType = RayHitTest(ray, scene, lights, record);
@@ -263,22 +229,22 @@ void MainWindow::RenderImage(const RenderParams &params,
 
   // Create a new image
   std::shared_ptr<QImage> q_image = std::make_shared<QImage>(
-    resolution.x * params.image_scale_ratio,
-    resolution.y * params.image_scale_ratio,
+    resolution(0) * params.image_scale_ratio,
+    resolution(1) * params.image_scale_ratio,
     QImage::Format_RGB888);
 
   // Save rendered pixels, we need to scale them later for visualization
-  int pixel_num = resolution.x * resolution.y;
+  int pixel_num = resolution(0) * resolution(1);
   std::vector<float> pixel_Rs(pixel_num);
   std::vector<float> pixel_Gs(pixel_num);
   std::vector<float> pixel_Bs(pixel_num);
-  std::vector<glm::vec3> pixel_list(pixel_num);
+  std::vector<Vec3f> pixel_list(pixel_num);
 
   float brightest = 0.01f;
   tbb::parallel_for (tbb::blocked_range<int>(0, pixel_num),
     [&](tbb::blocked_range<int> r) {
     for (int i = r.begin(); i < r.end(); ++i) {
-      RenderPixels(camera, i, resolution.x, pixel_list, scene, lights);
+      RenderPixels(camera, i, resolution(0), pixel_list, scene, lights);
 
       pixel_Rs[i] = pixel_list[i][0];
       pixel_Gs[i] = pixel_list[i][1];
@@ -307,8 +273,8 @@ void MainWindow::RenderImage(const RenderParams &params,
   float scale = 255.0f / maxRadiance;
 
   int arrayIdx = 0;
-  for (int row = 0; row < resolution.y; ++row) {
-    for (int col = 0; col < resolution.x; ++col) {
+  for (int row = 0; row < resolution(1); ++row) {
+    for (int col = 0; col < resolution(0); ++col) {
       pixel_list[arrayIdx] *= scale;
       int R = std::min((int)pixel_list[arrayIdx][0], 255);
       int G = std::min((int)pixel_list[arrayIdx][1], 255);
@@ -368,23 +334,23 @@ int MainWindow::RayHitTest(const Ray &ray,
 float diffuseStrength = 0.8f;
 float specularStrength = 1.0f - diffuseStrength;
 float levelDegenerateRatio = 0.5f;
-glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
+Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
   const std::vector<std::shared_ptr<GeometryObject>> &scene,
   const std::vector<std::shared_ptr<LightBase>> &lights, int level) {
   // level starts from 1
   if (level > 3)
-    return glm::vec3(0, 0, 0);
+    return Vec3f::Zero();
 
-  glm::vec3 diffuse(0.0f);
-  glm::vec3 specular(0.0f);
+  Vec3f diffuse = Vec3f::Zero();
+  Vec3f specular = Vec3f::Zero();
 
-  glm::vec3 reflectionColor = glm::vec3(0, 0, 0);
+  Vec3f reflectionColor = Vec3f::Zero();
   Ray reflectionRay(record.hit_point, record.r_direction);
   RayHitObjectRecord reflectionHitRecord;
   int hitType = RayHitTest(reflectionRay, scene, lights, reflectionHitRecord);
   if (hitType == 1) {
-    glm::vec3 recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, lights, level + 1);
-    reflectionColor = levelDegenerateRatio * std::max(dot(record.hit_normal, record.r_direction), 0.0f) * recursiveHitPointColor;
+    Vec3f recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, lights, level + 1);
+    reflectionColor = levelDegenerateRatio * std::max(record.hit_normal.dot(record.r_direction), 0.0f) * recursiveHitPointColor;
   }
   else if (hitType == 2) {
     specular += specularStrength * reflectionHitRecord.point_color;
@@ -392,9 +358,9 @@ glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
 
   RayHitObjectRecord lightHitRecord;
   // for each light source
-  std::vector<glm::vec3> lightColorList;
+  std::vector<Vec3f> lightColorList;
   std::vector<float> lightDisList;
-  std::vector<glm::vec3> lightDirList;
+  std::vector<Vec3f> lightDirList;
   for (auto light : lights) {
     lightColorList.clear();
     lightDisList.clear();
@@ -404,7 +370,7 @@ glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
     for (unsigned int j = 0; j < lightDirList.size(); ++j) {
       Ray lightRay(record.hit_point, lightDirList[j]);
       if (!RayHitTest(lightRay, scene, lights, lightHitRecord, lightDisList[j])) {
-        float diff = std::max(dot(record.hit_normal, lightDirList[j]), 0.0f);
+        float diff = std::max(record.hit_normal.dot(lightDirList[j]), 0.0f);
         diffuse += diffuseStrength * diff * lightColorList[j];
       }
     }
@@ -416,14 +382,14 @@ glm::vec3 MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
     diffuse *= 1.0f;
   }
 
-  glm::vec3 returnColor = glm::vec3(0);
+  Vec3f returnColor = Vec3f(0);
   returnColor += diffuse / (float)lightDirList.size() + specular;
   //if (1 == level)
-  //  returnColor = glm::vec3(0, 0, 0);
+  //  returnColor = Vec3f(0, 0, 0);
 
   returnColor += reflectionColor;
 
-  returnColor *= record.point_color;
+  returnColor.cwiseProduct(record.point_color);
 
   return returnColor;
 }

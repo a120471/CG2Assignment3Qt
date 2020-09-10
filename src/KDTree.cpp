@@ -25,7 +25,7 @@ void KDTree::BuildKDTree(std::vector<Triangle*> &faces,
     // compute the bounding box
     faces[head]->GetBoundingBox(node->AA, node->BB);
     for (auto i = faces.begin() + head + 1; i < faces.begin() + tail; ++i) {
-      glm::vec3 AT, BT;
+      Vec3f AT, BT;
       (*i)->GetBoundingBox(AT, BT);
       MergeBoundingBox(node->AA, node->BB, node->AA, node->BB, AT, BT);
     }

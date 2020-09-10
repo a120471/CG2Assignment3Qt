@@ -2,8 +2,8 @@
 
 #include <vector>
 #include <ctime>
-#include <glm/vec3.hpp>
 #include "RayTracingCamera.h"
+#include "Type.h"
 
 const float MYINFINITE = 999999.f;
 
@@ -47,8 +47,8 @@ void inline MySwap(T &t1, T &t2) {
   t2 = tmp;
 };
 
-static void MergeBoundingBox(glm::vec3 &A, glm::vec3 &B,
-  glm::vec3 A1, glm::vec3 B1, glm::vec3 A2, glm::vec3 B2) {
+static void MergeBoundingBox(Vec3f &A, Vec3f &B,
+  Vec3f A1, Vec3f B1, Vec3f A2, Vec3f B2) {
   A[0] = std::min(A1[0], A2[0]);
   A[1] = std::min(A1[1], A2[1]);
   A[2] = std::min(A1[2], A2[2]);
@@ -59,29 +59,29 @@ static void MergeBoundingBox(glm::vec3 &A, glm::vec3 &B,
 }
 
 // Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-static bool RayHitAABB(const Ray &ray, const glm::vec3 &A, const glm::vec3 &B) {
-  float abs_dx = abs(ray.direction.x);
-  float abs_dy = abs(ray.direction.y);
-  float abs_dz = abs(ray.direction.z);
+static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
+  float abs_dx = abs(ray.direction(0));
+  float abs_dy = abs(ray.direction(1));
+  float abs_dz = abs(ray.direction(2));
 
-  glm::vec3 A_RS = A - ray.s_point;
-  glm::vec3 B_RS = B - ray.s_point;
+  Vec3f A_RS = A - ray.s_point;
+  Vec3f B_RS = B - ray.s_point;
 
-  if (abs_dx < MYEPSILON && (SmallerThanEps(ray.s_point.x, A.x) || BiggerThanEps(ray.s_point.x, B.x))) {
+  if (abs_dx < MYEPSILON && (SmallerThanEps(ray.s_point(0), A(0)) || BiggerThanEps(ray.s_point(0), B(0)))) {
     return false;
   }
-  if (abs_dy < MYEPSILON && (SmallerThanEps(ray.s_point.y, A.y) || BiggerThanEps(ray.s_point.y, B.y))) {
+  if (abs_dy < MYEPSILON && (SmallerThanEps(ray.s_point(1), A(1)) || BiggerThanEps(ray.s_point(1), B(1)))) {
     return false;
   }
-  if (abs_dz < MYEPSILON && (SmallerThanEps(ray.s_point.z, A.z) || BiggerThanEps(ray.s_point.z, B.z))) {
+  if (abs_dz < MYEPSILON && (SmallerThanEps(ray.s_point(2), A(2)) || BiggerThanEps(ray.s_point(2), B(2)))) {
     return false;
   }
   float max_tmin = -MYINFINITE, min_tmax = MYINFINITE;
 
   bool valid = false;
   if (abs_dx > MYEPSILON) {
-    float t1 = A_RS.x / ray.direction.x;
-    float t2 = B_RS.x / ray.direction.x;
+    float t1 = A_RS(0) / ray.direction(0);
+    float t2 = B_RS(0) / ray.direction(0);
     if (t1 > t2) {
       MySwap(t1, t2);
     }
@@ -92,8 +92,8 @@ static bool RayHitAABB(const Ray &ray, const glm::vec3 &A, const glm::vec3 &B) {
     }
   }
   if (abs_dy > MYEPSILON) {
-    float t1 = A_RS.y / ray.direction.y;
-    float t2 = B_RS.y / ray.direction.y;
+    float t1 = A_RS(1) / ray.direction(1);
+    float t2 = B_RS(1) / ray.direction(1);
     if (t1 > t2) {
       MySwap(t1, t2);
     }
@@ -104,8 +104,8 @@ static bool RayHitAABB(const Ray &ray, const glm::vec3 &A, const glm::vec3 &B) {
     }
   }
   if (abs_dz > MYEPSILON) {
-    float t1 = A_RS.z / ray.direction.z;
-    float t2 = B_RS.z / ray.direction.z;
+    float t1 = A_RS(2) / ray.direction(2);
+    float t2 = B_RS(2) / ray.direction(2);
     if (t1 > t2) {
       MySwap(t1, t2);
     }
@@ -124,7 +124,7 @@ static bool RayHitAABB(const Ray &ray, const glm::vec3 &A, const glm::vec3 &B) {
 }
 
 // this function is inefficient and not precise
-static void BestCandidateAlgorithm(std::vector<glm::vec2> &point,
+static void BestCandidateAlgorithm(std::vector<Vec2f> &point,
   int num, float w, float h) {
   // candidate num is 2 here
   int candidateNum = 2;
@@ -138,11 +138,11 @@ static void BestCandidateAlgorithm(std::vector<glm::vec2> &point,
   point.emplace_back(rand() * w / RAND_MAX - w / 2, rand() * h / RAND_MAX - h / 2);
   for (int i = 1; i < num; ++i) {
     float maxDis = 0;
-    glm::vec2 curCandidate;
+    Vec2f curCandidate;
     for (int j = 0; j < candidateNum; ++j) {
-      glm::vec2 tmpCandidate(rand() * w / RAND_MAX - w / 2, rand() * h / RAND_MAX - h / 2);
-      for (std::vector<glm::vec2>::iterator k = point.begin(); k != point.end(); ++k) {
-        float tmpDis = length(*k - tmpCandidate);
+      Vec2f tmpCandidate(rand() * w / RAND_MAX - w / 2, rand() * h / RAND_MAX - h / 2);
+      for (std::vector<Vec2f>::iterator k = point.begin(); k != point.end(); ++k) {
+        float tmpDis = (*k - tmpCandidate).norm();
         if (maxDis < tmpDis) {
           maxDis = tmpDis;
           curCandidate = tmpCandidate;
