@@ -123,6 +123,37 @@ static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
   }
 }
 
+// bool VoxelNode::CalculateRayHit(const Vec3f &ray_o, const Vec3f &normalized_d,
+//   float &near_distance) const {
+//   Vec3f min_corner = center_ - Vec3f::Ones() * side_len_;
+//   Vec3f max_corner = center_ + Vec3f::Ones() * side_len_;
+//   Vec3f min_dc = min_corner - ray_o;
+//   Vec3f max_dc = max_corner - ray_o;
+//   float max_tmin = -std::numeric_limits<float>::max();
+//   float min_tmax = std::numeric_limits<float>::max();
+
+//   for (int i = 0; i < 3; ++i) {
+//     if (abs(normalized_d(i)) > EPSILON) {
+//       float t1 = min_dc(i) / normalized_d(i);
+//       float t2 = max_dc(i) / normalized_d(i);
+//       if (t1 > t2) {
+//         std::swap(t1, t2);
+//       }
+//       max_tmin = std::max(max_tmin, t1);
+//       min_tmax = std::min(min_tmax, t2);
+//     } else if (min_dc(i) * max_dc(i) > 0) {
+//       return false;
+//     }
+//   }
+
+//   if (ApproxiSmaller(max_tmin, min_tmax) && min_tmax > 0) {
+//     near_distance = max_tmin;
+//     return true;
+//   } else {
+//     return false;
+//   }
+// }
+
 // this function is inefficient and not precise
 static void BestCandidateAlgorithm(std::vector<Vec2f> &point,
   int num, float w, float h) {
