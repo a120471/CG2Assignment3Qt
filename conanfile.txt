@@ -3,6 +3,7 @@ qt/5.15.0@bincrafters/stable
 eigen/3.3.7
 assimp/5.0.1
 tbb/2020.2
+stb/20200203
 
 [generators]
 cmake_find_package

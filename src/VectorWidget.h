@@ -29,7 +29,7 @@ VectorWidget<Scalar>::VectorWidget(const std::vector<Scalar> &values,
   QWidget *parent)
   : QWidget(parent) {
 
-  line_edit_.clear();
+  assert(line_edit_.empty());
   auto layout = new QHBoxLayout(this);
   layout->setMargin(0);
   for (auto v : values) {
@@ -43,7 +43,7 @@ VectorWidget<Scalar>::VectorWidget(const std::vector<Scalar> &values,
 template<typename Scalar>
 void VectorWidget<Scalar>::SetValidator() {
   for (auto w : line_edit_) {
-    if (std::is_same<Scalar, int>::value) {
+    if (std::is_same<Scalar, int32_t>::value) {
       w->setValidator(new QIntValidator(w));
     } else if (std::is_same<Scalar, uint32_t>::value) {
       w->setValidator(new QIntValidator(
@@ -70,7 +70,7 @@ VectorWidget<Scalar>::~VectorWidget() {
 template<typename Scalar>
 Eigen::Matrix<Scalar, Eigen::Dynamic, 1> VectorWidget<Scalar>::GetValue() {
   Eigen::Matrix<Scalar, Eigen::Dynamic, 1> ret(line_edit_.size());
-  for (int i = 0; i < line_edit_.size(); ++i) {
+  for (auto i = 0; i < line_edit_.size(); ++i) {
     ret(i) = (Scalar)(line_edit_[i]->text().toFloat());
   }
   return ret;

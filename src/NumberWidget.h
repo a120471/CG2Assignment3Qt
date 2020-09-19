@@ -28,7 +28,7 @@ NumberWidget<Scalar>::NumberWidget(Scalar value, QWidget *parent)
 
 template<typename Scalar>
 void NumberWidget<Scalar>::SetValidator() {
-  if (std::is_same<Scalar, int>::value) {
+  if (std::is_same<Scalar, int32_t>::value) {
     this->setValidator(new QIntValidator(this));
   } else if (std::is_same<Scalar, uint32_t>::value) {
     this->setValidator(new QIntValidator(

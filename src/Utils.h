@@ -5,21 +5,14 @@
 #include "RayTracingCamera.h"
 #include "Type.h"
 
-const float MYINFINITE = 999999.f;
-
-const float MYEPSILON = 2e-4;
-
-const float COLORINTENSITYTHRES = 2e4f;
-
-// #ifndef UNITAREASAMPLECOLOR
-// #define UNITAREASAMPLECOLOR (COLORINTENSITYTHRES / 10.0f)
-// #endif // !UNITAREASAMPLECOLOR
-
-const float NTHIDX = 0.85f;
-
-const uint32_t MYTHREADNUM = 8u;
-
 namespace ray_tracing {
+
+const float MYINFINITE = 999999.f;
+const float MYEPSILON = 2e-4;
+const float COLOR_INTENSITY_THRES = 2e4f;
+const float UNIT_SAMPLE_COLOR = COLOR_INTENSITY_THRES / 10.f;
+const float NTHIDX = 0.85f;
+const uint32_t MYTHREADNUM = 8u;
 
 extern bool hasHDRLighting;
 
@@ -153,35 +146,5 @@ static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
 //     return false;
 //   }
 // }
-
-// this function is inefficient and not precise
-static void BestCandidateAlgorithm(std::vector<Vec2f> &point,
-  int num, float w, float h) {
-  // candidate num is 2 here
-  int candidateNum = 2;
-
-  point.clear();
-  if (num == 0) {
-    return;
-  }
-
-  srand(time(0));
-  point.emplace_back(rand() * w / RAND_MAX - w / 2, rand() * h / RAND_MAX - h / 2);
-  for (int i = 1; i < num; ++i) {
-    float maxDis = 0;
-    Vec2f curCandidate;
-    for (int j = 0; j < candidateNum; ++j) {
-      Vec2f tmpCandidate(rand() * w / RAND_MAX - w / 2, rand() * h / RAND_MAX - h / 2);
-      for (std::vector<Vec2f>::iterator k = point.begin(); k != point.end(); ++k) {
-        float tmpDis = (*k - tmpCandidate).norm();
-        if (maxDis < tmpDis) {
-          maxDis = tmpDis;
-          curCandidate = tmpCandidate;
-        }
-      }
-    }
-    point.emplace_back(curCandidate);
-  }
-}
 
 }

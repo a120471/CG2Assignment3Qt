@@ -28,6 +28,14 @@ using namespace ray_tracing;
 
 std::mutex mutex;
 
+void CreateLights(std::vector<std::shared_ptr<LightBase>> &lights) {
+  lights.emplace_back(std::make_shared<PointLight>(
+    Vec3f(1.3f, 0.f, 1.f), Vec3f::Ones() * 0.7f));
+  lights.emplace_back(std::make_shared<PointLight>(
+    Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f) * 1.0f));
+  lights.emplace_back(std::make_shared<CubeMap>("../cubeMap.hdr", 30.1f));
+}
+
 Vec3f QStringListToVec3f(const QStringList &list) {
   return Vec3f(list[0].toFloat(), list[1].toFloat(), list[2].toFloat());
 }
@@ -150,11 +158,7 @@ void MainWindow::ChooseSceneFile() {
 void MainWindow::RenderScene() {
   // Create lights
   std::vector<std::shared_ptr<LightBase>> lights;
-  lights.emplace_back(std::make_shared<PointLight>(
-    Vec3f(1.3, 0, 1), Vec3f(1, 1, 1) * 0.7f));
-  lights.emplace_back(std::make_shared<PointLight>(
-    Vec3f(-1.1, 1, 0.5), Vec3f(0.4, 0.6, 0.5) * 1.0f));
-  // lights.emplace_back((LightBase*)new CubeMap("../cubeMap.hdr", 30.1f));
+  CreateLights(lights);
 
   // Create scene
   std::vector<std::shared_ptr<GeometryObject>> scene;
@@ -318,15 +322,15 @@ int MainWindow::RayHitTest(const Ray &ray,
       return hitType;
     }
   }
-  if (lightDis == MYINFINITE) {
-    for (auto light : lights) {
-      light->RayIntersection(ray, tmpRecord);
-      if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
-        record = tmpRecord;
-        hitType = 2;
-      }
-    }
-  }
+  // if (lightDis == MYINFINITE) {
+  //   for (auto light : lights) {
+  //     light->RayIntersection(ray, tmpRecord);
+  //     if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
+  //       record = tmpRecord;
+  //       hitType = 2;
+  //     }
+  //   }
+  // }
 
   return hitType;
 }
@@ -358,20 +362,16 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
 
   RayHitObjectRecord lightHitRecord;
   // for each light source
-  std::vector<Vec3f> lightColorList;
-  std::vector<float> lightDisList;
-  std::vector<Vec3f> lightDirList;
+  std::vector<LightInfoToPoint> infos;
   for (auto light : lights) {
-    lightColorList.clear();
-    lightDisList.clear();
-    lightDirList.clear();
-    light->GetLight(record.hit_point, lightColorList, lightDisList, lightDirList);
+    infos.clear();
+    light->AppendToLightInfo(record.hit_point, infos);
 
-    for (unsigned int j = 0; j < lightDirList.size(); ++j) {
-      Ray lightRay(record.hit_point, lightDirList[j]);
-      if (!RayHitTest(lightRay, scene, lights, lightHitRecord, lightDisList[j])) {
-        float diff = std::max(record.hit_normal.dot(lightDirList[j]), 0.0f);
-        diffuse += diffuseStrength * diff * lightColorList[j];
+    for (const auto &info : infos) {
+      Ray lightRay(record.hit_point, info.direction);
+      if (!RayHitTest(lightRay, scene, lights, lightHitRecord, info.distance)) {
+        float diff = std::max(record.hit_normal.dot(info.direction), 0.0f);
+        diffuse += diffuseStrength * diff * info.color;
       }
     }
   }
@@ -383,7 +383,7 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
   }
 
   Vec3f returnColor = Vec3f(0);
-  returnColor += diffuse / (float)lightDirList.size() + specular;
+  returnColor += diffuse / (float)infos.size() + specular;
   //if (1 == level)
   //  returnColor = Vec3f(0, 0, 0);
 

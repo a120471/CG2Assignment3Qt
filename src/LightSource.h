@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 #include "Type.h"
 
 namespace ray_tracing {
@@ -8,92 +9,111 @@ namespace ray_tracing {
 class Ray;
 struct RayHitObjectRecord;
 
-// we normalize light color in unit voxel space, may be too big?!
+struct LightInfoToPoint {
+  LightInfoToPoint(const Vec3f &c, const Vec3f &dir, float d)
+  : color(c)
+  , direction(dir)
+  , distance(d) {
+  }
+
+  Vec3f color;
+  Vec3f direction;
+  float distance;
+};
+
+//// ?we normalize light color in unit voxel space, may be too big?!
+
 class LightBase {
 public:
   virtual ~LightBase() = default;
 
-  virtual void GetLight(const Vec3f &s_point,
-    std::vector<Vec3f> &colors,
-    std::vector<float> &distances,
-    std::vector<Vec3f> &light_dirs) = 0;
+  virtual void AppendToLightInfo(const Vec3f &s_point,
+    std::vector<LightInfoToPoint> &infos) const = 0;
 
-  virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
+  // virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
 };
 
-// a voxel point light, will a voxel be toooooo big?
+//// ?a voxel point light, will a voxel be toooooo big?
 class PointLight : public LightBase {
 public:
   PointLight(const Vec3f &pos, const Vec3f &color);
 
-  void GetLight(const Vec3f &s_point,
-    std::vector<Vec3f> &colors,
-    std::vector<float> &distances,
-    std::vector<Vec3f> &light_dirs) override;
+  void AppendToLightInfo(const Vec3f &s_point,
+    std::vector<LightInfoToPoint> &infos) const override;
 
-  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  // void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
 private:
   Vec3f pos_;
   Vec3f color_;
 };
 
-// class AreaLight : public LightBase {
-// public:
-//   AreaLight(Vec2f areaWH, Vec2i resoWH, Vec3f pos, Vec3f totalColor, Vec3f dRight, Vec3f dDown);
-//   virtual ~AreaLight();
+class AreaLight : public LightBase {
+public:
+  AreaLight(const Vec3f &pos, const Vec3f &sum_color,
+    const Vec2f &size, const Vec3f &right_dir, const Vec3f &down_dir);
 
-//   void GetLight(Vec3f, std::vector<Vec3f>&, std::vector<float>&, std::vector<Vec3f>&) override;
+  void AppendToLightInfo(const Vec3f &s_point,
+    std::vector<LightInfoToPoint> &infos) const override;
 
-//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+  // void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
-// private:
-//   Vec3f unitColor, pos, normal;
-//   float w, h;
-//   std::vector<PointLight*> pointSamples;
-// };
+private:
+  void GenerateCandidate(const Vec2f &size,
+    uint32_t num, std::vector<Vec2f> &points);
 
-// class SquareMap : public LightBase {
-// public:
-//   SquareMap(Vec3f **data, int n, Vec3f ulCorner, Vec3f dRight, Vec3f dDown, float size);
-//   virtual ~SquareMap();
+  std::vector<std::shared_ptr<PointLight>> samples_;
+};
 
-//   void GetLight(Vec3f, std::vector<Vec3f>&, std::vector<float>&, std::vector<Vec3f>&) override;
+class CubeMapFace : public LightBase {
+public:
+  CubeMapFace(std::vector<std::vector<Vec3f>> &&data,
+    const Vec3f &center, const Vec3f &right_dir,
+    const Vec3f &down_dir, float size);
 
-//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+  void AppendToLightInfo(const Vec3f &s_point,
+    std::vector<LightInfoToPoint> &infos) const override;
 
-// private:
-//   Vec3f **data;
-//   int n;
-//   Vec3f ulCorner, dRight, dDown;
-//   float size;
-//   Vec3f normal;
-//   float D;
-//   QuadTree* quadT;
-//   std::vector<AreaLight*> lightSamples;
-// };
+  // void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
 
-// class CubeMap : public LightBase {
-// public:
-//   CubeMap(std::string cubeMapPath, float size);
-//   CubeMap(std::string cubeMapPath[]);
-//   virtual ~CubeMap();
+private:
+  std::vector<std::vector<Vec3f>> data_;
+  Vec3f center_;
+  Vec3f right_dir_;
+  Vec3f down_dir_;
+  float size_;
+  Vec3f normal_;
+  float D_;
+  std::vector<std::shared_ptr<AreaLight>> light_samples_;
+};
 
-//   void GetLight(Vec3f, std::vector<Vec3f>&, std::vector<float>&, std::vector<Vec3f>&) override;
+enum CubeMapFaceType {
+  TOP,
+  BOTTOM,
+  LEFT,
+  RIGHT,
+  FORWARD,
+  BACKWARD
+};
 
-//   void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+class CubeMap : public LightBase {
+public:
+  CubeMap(const std::string &filepath, float size);
 
-// private:
-//   float *loadImage;
-//   int width, height, dimension, N;
-//   SquareMap *top;
-//   SquareMap *bottom;
-//   SquareMap *left;
-//   SquareMap *right;
-//   SquareMap *forward;
-//   SquareMap *backward;
+  void AppendToLightInfo(const Vec3f &s_point,
+    std::vector<LightInfoToPoint> &infos) const override;
 
-//   void ExtractSquareMap(SquareMap *&sm, int smIdx, int rowIdx, int colIdx, bool rowInverse, bool colInverse, float size);
-// };
+  // void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+
+private:
+  std::shared_ptr<CubeMapFace> CreateFace(int face_type,
+    int r_index, int c_index, bool row_inverse, bool col_inverse,
+    float size, float *image_data);
+
+  bool hdr_flag_;
+  int width_, height_, dimension_, N_;
+  // top, bottom, left, right, forward, backward
+  std::vector<std::shared_ptr<CubeMapFace>> faces_;
+};
 
 }

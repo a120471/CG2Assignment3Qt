@@ -1,12 +1,10 @@
 #include "LightSource.h"
-#include "GeometryObject.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#include "QuadTree.h"
+#include "Utils.h"
 
 namespace ray_tracing {
-
-// // stb_image, Reference: https://github.com/nothings/stb/blob/master/stb_image.h#L4
-// #define STB_IMAGE_IMPLEMENTATION
-// #include <stb_image.h>
-
 
 bool hasHDRLighting;
 
@@ -15,101 +13,120 @@ PointLight::PointLight(const Vec3f &pos, const Vec3f &color)
   , color_(color) {
 }
 
-void PointLight::GetLight(const Vec3f &s_point,
-  std::vector<Vec3f> &colors,
-  std::vector<float> &distances,
-  std::vector<Vec3f> &light_dirs) {
-  colors.emplace_back(color_);
-  distances.emplace_back((pos_, s_point).norm());
-  light_dirs.emplace_back((pos_ - s_point).normalized());
+void PointLight::AppendToLightInfo(const Vec3f &s_point,
+  std::vector<LightInfoToPoint> &infos) const {
+  infos.emplace_back(color_,
+    (pos_ - s_point).normalized(),
+    (pos_ - s_point).norm());
 }
 
-void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  record.hit_point = Vec3f(0, 0, 0);
-  record.hit_normal = Vec3f(0, 0, 0);
-  record.r_direction = Vec3f(0, 0, 0);
-  record.point_color = Vec3f(0, 0, 0);
-  record.depth = -1;
+// void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
+//   record.hit_point = Vec3f(0, 0, 0);
+//   record.hit_normal = Vec3f(0, 0, 0);
+//   record.r_direction = Vec3f(0, 0, 0);
+//   record.point_color = Vec3f(0, 0, 0);
+//   record.depth = -1;
+// }
+
+
+AreaLight::AreaLight(const Vec3f &pos, const Vec3f &sum_color,
+  const Vec2f &size, const Vec3f &right_dir, const Vec3f &down_dir) {
+
+  Vec3f sample_num = sum_color / UNIT_SAMPLE_COLOR;
+  uint32_t num = (uint32_t)sample_num.maxCoeff();
+
+  // sample num points on the area
+  std::vector<Vec2f> points;
+  GenerateCandidate(size, num, points);
+
+  for (const auto &p : points) {
+    Vec3f sample_pos = pos + right_dir * p(0) + down_dir * p(1);
+    samples_.emplace_back(std::make_shared<PointLight>(
+      sample_pos, sum_color / (float)num));
+  }
+}
+
+void AreaLight::AppendToLightInfo(const Vec3f &s_point,
+  std::vector<LightInfoToPoint> &infos) const {
+  for (const auto &sample : samples_) {
+    sample->AppendToLightInfo(s_point, infos);
+  }
+}
+
+// void AreaLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
+//   // todo
+//   return;
+//   // record.hit_point = Vec3f(0, 0, 0);
+//   // record.hit_normal = Vec3f(0, 0, 0);
+//   // record.r_direction = Vec3f(0, 0, 0);
+//   // record.point_color = Vec3f(0, 0, 0);
+//   // record.depth = -1;
+// }
+
+// Mitchell’s best-candidate algorithm
+// This implementation is neither efficient nor precise
+void AreaLight::GenerateCandidate(const Vec2f &size,
+    uint32_t num, std::vector<Vec2f> &points) {
+  points.clear();
+  if (num == 0) {
+    return;
+  }
+
+  const int CANDIDATE_NUM = 2;
+  uint32_t w = size(0);
+  uint32_t h = size(1);
+
+  srand(time(0));
+  points.emplace_back(((float)rand() / RAND_MAX - 0.5f) * w,
+    ((float)rand() / RAND_MAX - 0.5f) * h);
+  for (auto i = 1; i < num; ++i) {
+    float max_dis = 0;
+    Vec2f best_candidate;
+    for (auto j = 0; j < CANDIDATE_NUM; ++j) {
+      Vec2f candidate(((float)rand() / RAND_MAX - 0.5f) * w,
+        ((float)rand() / RAND_MAX - 0.5f) * h);
+      for (const auto &p : points) {
+        float dis = (p - candidate).norm();
+        if (max_dis < dis) {
+          max_dis = dis;
+          best_candidate = candidate;
+        }
+      }
+    }
+    points.emplace_back(best_candidate);
+  }
 }
 
 
-// AreaLight::AreaLight(Vec2f areaWH, Vec2i resoWH, Vec3f pos, Vec3f totalColor, Vec3f dRight, Vec3f dDown)
-//   : unitColor(totalColor / static_cast<float>(resoWH[0] * resoWH[1]))
-//   , pos(pos)
-//   , w(areaWH[0])
-//   , h(areaWH[1]) {
-//   normal = dDown.cross(dRight).normalized();
+CubeMapFace::CubeMapFace(std::vector<std::vector<Vec3f>> &&data,
+  const Vec3f &center, const Vec3f &right_dir,
+  const Vec3f &down_dir, float size)
+  : data_(std::move(data))
+  , center_(center)
+  , right_dir_(right_dir)
+  , down_dir_(down_dir)
+  , size_(size) {
 
-//   float numF = totalColor(0) / UNITAREASAMPLECOLOR;
-//   numF = std::max(numF, totalColor(1) / UNITAREASAMPLECOLOR);
-//   numF = std::max(numF, totalColor(2) / UNITAREASAMPLECOLOR);
-//   int num = static_cast<int>(numF);
+  auto tree = std::make_shared<QuadTree>(data_, size_);
+  const auto &node_infos = tree->GetNodeInfos();
+  for (const auto &info : node_infos) {
+    Vec3f pos = center_ + right_dir_ * info.pos(0) + down_dir_ * info.pos(1);
+    light_samples_.emplace_back(std::make_shared<AreaLight>(pos,
+      info.sum_color, info.size, right_dir_, down_dir_));
+  }
 
-//   std::vector<Vec2f> point;
-//   BestCandidateAlgorithm(point, num, areaWH[0], areaWH[1]);
+  // normal_ = down_dir_.cross(right_dir_).normalized();
+  // D = -ulCorner.dot(normal);
+}
 
-//   for (int i = 0; i < num; ++i) {
-//     Vec3f pointPos;
-//     pointPos = pos + dRight * point[i](0) + dDown * point[i](1);
-//     pointSamples.emplace_back(new PointLight(pointPos, unitColor / (float)num));
-//   }
-// }
-// AreaLight::~AreaLight() {
-//   for (std::vector<PointLight*>::iterator i = pointSamples.begin(); i != pointSamples.end(); ++i) {
-//     SafeDelete(*i);
-//   }
-// }
-// void AreaLight::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
-//   for (int i = 0; i < pointSamples.size(); ++i) {
-//     pointSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
-//   }
-// }
-// void AreaLight::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-//   rhor.hit_point = Vec3f(0, 0, 0);
-//   rhor.hit_normal = Vec3f(0, 0, 0);
-//   rhor.r_direction = Vec3f(0, 0, 0);
-//   rhor.point_color = Vec3f(0, 0, 0);
-//   rhor.depth = -1;
-// }
+void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
+  std::vector<LightInfoToPoint> &infos) const {
+  for (const auto &sample : light_samples_) {
+    sample->AppendToLightInfo(s_point, infos);
+  }
+}
 
-// SquareMap::SquareMap(Vec3f **data, int n, Vec3f ulCorner, Vec3f dRight, Vec3f dDown, float size)
-//   : data(data)
-//   , n(n)
-//   , ulCorner(ulCorner)
-//   , dRight(dRight)
-//   , dDown(dDown)
-//   , size(size)
-//   , quadT(NULL) {
-//   this->normal = dDown.cross(dRight).normalized();
-//   this->D = -ulCorner.dot(normal);
-
-//   this->quadT = new QuadTree(data, n, size);
-
-//   for (unsigned int i = 0; i < quadT->areaColor.size(); ++i) {
-//     Vec3f pos;
-//     pos = ulCorner + (dRight * (float)quadT->posRC[i][1] + dDown * (float)quadT->posRC[i][0]) * (size / n);
-//     this->lightSamples.emplace_back(new AreaLight(quadT->sizeWH[i], quadT->resoWH[i], pos, quadT->areaColor[i], dRight, dDown));
-//   }
-// }
-// SquareMap::~SquareMap() {
-//   for (int i = 0; i < n; ++i) {
-//     delete[] data[i];
-//     data[i] = NULL;
-//   }
-//   delete[] data;
-//   data = NULL;
-
-//   for (std::vector<AreaLight*>::iterator i = lightSamples.begin(); i != lightSamples.end(); ++i) {
-//     SafeDelete(*i);
-//   }
-//   SafeDelete(quadT);
-// }
-// void SquareMap::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
-//   for (unsigned int i = 0; i < this->lightSamples.size(); ++i) {
-//     this->lightSamples[i]->GetLight(sPoint, colorList, disList, lightDirList);
-//   }
-// }
-// void SquareMap::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+// void CubeMapFace::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
 //   Vec3f sp = ray.sPoint;
 //   Vec3f d = ray.direction;
 
@@ -188,118 +205,119 @@ void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   rhor.depth = -1;
 // }
 
-// CubeMap::CubeMap(std::string cubeMapPath, float size)
-//   : loadImage(NULL) {
-//   hasHDRLighting = stbi_is_hdr(cubeMapPath.c_str());
-//   loadImage = stbi_loadf(cubeMapPath.c_str(), &width, &height, &dimension, 0);
-//   N = width > height ? width / 4 : height / 4;
 
-//   if (dimension != 3) {
-//     /* should be forbidden */
-//     exit(-1);
-//   }
+CubeMap::CubeMap(const std::string &filepath, float size) {
+  hdr_flag_ = stbi_is_hdr(filepath.c_str());
+  auto stb_image = stbi_loadf(filepath.c_str(), &width_, &height_, &dimension_, 0);
+  N_ = width_ > height_ ? width_ / 4 : height_ / 4;
 
-//   ExtractSquareMap(top, 0, 0, 1, false, false, size);    // top
-//   ExtractSquareMap(bottom, 1, 2, 1, false, false, size);  // bottom
-//   ExtractSquareMap(left, 2, 1, 0, false, false, size);  // left
-//   ExtractSquareMap(right, 3, 1, 2, false, false, size);  // right
-//   ExtractSquareMap(forward, 4, 1, 1, false, false, size);  // forward
-//   if (width > height)
-//     ExtractSquareMap(backward, 5, 1, 3, false, false, size);// backward
-//   else
-//     ExtractSquareMap(backward, 5, 3, 1, true, true, size);  // backward
+  if (dimension_ != 3) {
+    /* should be forbidden */
+    exit(-1);
+  }
 
-//   stbi_image_free(loadImage);
-// }
-// CubeMap::CubeMap(std::string cubeMapPath[]) {
-//   /* to do */
-// }
-// CubeMap::~CubeMap() {
-//   SafeDelete(top);
-//   SafeDelete(bottom);
-//   SafeDelete(left);
-//   SafeDelete(right);
-//   SafeDelete(forward);
-//   SafeDelete(backward);
-// }
-// void CubeMap::ExtractSquareMap(SquareMap *&sm, int idx, int rowIdx, int colIdx, bool rowInverse, bool colInverse, float size) {
-//   Vec3f **area = new Vec3f*[N];
-//   for (int i = 0; i < N; ++i)
-//     area[i] = new Vec3f[N];
-//   // do not delete area, we delete it in ~SquareMap()
+  faces_.emplace_back(CreateFace(TOP, 0, 1,
+    false, false, size, stb_image));
+  faces_.emplace_back(CreateFace(BOTTOM, 2, 1,
+    false, false, size, stb_image));
+  faces_.emplace_back(CreateFace(LEFT, 1, 0,
+    false, false, size, stb_image));
+  faces_.emplace_back(CreateFace(RIGHT, 1, 2,
+    false, false, size, stb_image));
+  faces_.emplace_back(CreateFace(FORWARD, 1, 1,
+    false, false, size, stb_image));
+  if (width_ > height_) {
+    faces_.emplace_back(CreateFace(BACKWARD, 1, 3,
+      false, false, size, stb_image));
+  } else {
+    faces_.emplace_back(CreateFace(BACKWARD, 3, 1,
+      true, true, size, stb_image));
+  }
 
-//   int rI, imageI;
-//   rI = rowInverse ? rowIdx * N + N - 1 : rowIdx * N;
-//   rI *= width * dimension;
-//   for (int r = 0; r < N; ++r) {
-//     if (!colInverse) {
-//       imageI = rI + colIdx * N * dimension;
-//       for (int c = 0; c < N; ++c) {
-//         area[r][c] = Vec3f(loadImage[imageI], loadImage[imageI + 1], loadImage[imageI + 2]);
-//         imageI += 3;
-//       }
-//     }
-//     else {
-//       imageI = rI + (colIdx + 1) * N * dimension - 1;
-//       for (int c = 0; c < N; ++c) {
-//         area[r][c] = Vec3f(loadImage[imageI - 2], loadImage[imageI - 1], loadImage[imageI]);
-//         imageI -= 3;
-//       }
-//     }
+  stbi_image_free(stb_image);
+}
 
-//     rI += rowInverse ? -width * dimension : width * dimension;
-//   }
+std::shared_ptr<CubeMapFace> CubeMap::CreateFace(
+  int face_type, int r_index, int c_index,
+  bool row_inverse, bool col_inverse, float size,
+  float *image_data) {
 
-//   // to calculate area light's pos
-//   Vec3f ulCorner, dR, dD;
-//   float size_2 = size / 2.0f;
-//   switch (idx) {
-//   case 0: // top
-//     ulCorner = Vec3f(-size_2, size_2, size_2);
-//     dR = Vec3f(1, 0, 0);
-//     dD = Vec3f(0, 0, -1);
-//     break;
-//   case 1: // bottom
-//     ulCorner = Vec3f(-size_2, -size_2, -size_2);
-//     dR = Vec3f(1, 0, 0);
-//     dD = Vec3f(0, 0, 1);
-//     break;
-//   case 2: // left
-//     ulCorner = Vec3f(-size_2, size_2, size_2);
-//     dR = Vec3f(0, 0, -1);
-//     dD = Vec3f(0, -1, 0);
-//     break;
-//   case 3: // right
-//     ulCorner = Vec3f(size_2, size_2, -size_2);
-//     dR = Vec3f(0, 0, 1);
-//     dD = Vec3f(0, -1, 0);
-//     break;
-//   case 4: // forward
-//     ulCorner = Vec3f(-size_2, size_2, -size_2);
-//     dR = Vec3f(1, 0, 0);
-//     dD = Vec3f(0, -1, 0);
-//     break;
-//   case 5: // backward
-//     ulCorner = Vec3f(size_2, size_2, size_2);
-//     dR = Vec3f(-1, 0, 0);
-//     dD = Vec3f(0, -1, 0);
-//     break;
-//   }
+  // calculate light's info on each face type
+  Vec3f center, right_dir, down_dir;
+  float half_size = size / 2.0f;
+  switch (face_type) {
+  case TOP:
+    center = Vec3f(0.f, half_size, 0.f);
+    right_dir = Vec3f(1.f, 0.f, 0.f);
+    down_dir = Vec3f(0.f, 0.f, -1.f);
+    break;
+  case BOTTOM:
+    center = Vec3f(0.f, -half_size, 0.f);
+    right_dir = Vec3f(1.f, 0.f, 0.f);
+    down_dir = Vec3f(0.f, 0.f, 1.f);
+    break;
+  case LEFT:
+    center = Vec3f(-half_size, 0.f, 0.f);
+    right_dir = Vec3f(0.f, 0.f, -1.f);
+    down_dir = Vec3f(0.f, -1.f, 0.f);
+    break;
+  case RIGHT:
+    center = Vec3f(half_size, 0.f, 0.f);
+    right_dir = Vec3f(0.f, 0.f, 1.f);
+    down_dir = Vec3f(0.f, -1.f, 0.f);
+    break;
+  case FORWARD:
+    center = Vec3f(0.f, 0.f, -half_size);
+    right_dir = Vec3f(1.f, 0.f, 0.f);
+    down_dir = Vec3f(0.f, -1.f, 0.f);
+    break;
+  case BACKWARD:
+    center = Vec3f(0.f, 0.f, half_size);
+    right_dir = Vec3f(-1.f, 0.f, 0.f);
+    down_dir = Vec3f(0.f, -1.f, 0.f);
+    break;
+  }
 
-//   sm = new SquareMap(area, N, ulCorner, dR, dD, size);
-// }
-// void CubeMap::GetLight(Vec3f sPoint, std::vector<Vec3f> &colorList, std::vector<float> &disList, std::vector<Vec3f> &lightDirList) {
-//   this->top->GetLight(sPoint, colorList, disList, lightDirList);
-//   // this->bottom->GetLight(sPoint, colorList, disList, lightDirList);
-//   this->left->GetLight(sPoint, colorList, disList, lightDirList);
-//   this->right->GetLight(sPoint, colorList, disList, lightDirList);
-//   this->forward->GetLight(sPoint, colorList, disList, lightDirList);
-//   this->backward->GetLight(sPoint, colorList, disList, lightDirList);
-// }
+  std::vector<std::vector<Vec3f>> face_data(N_);
+  for (auto i = 0; i < N_; ++i)
+    face_data[i].resize(N_);
+
+  int rI, imageI;
+  rI = row_inverse ? r_index * N_ + N_ - 1 : r_index * N_;
+  rI *= width_ * dimension_;
+  for (auto r = 0; r < N_; ++r) {
+    if (!col_inverse) {
+      imageI = rI + c_index * N_ * dimension_;
+      for (auto c = 0; c < N_; ++c) {
+        face_data[r][c] = Vec3f(
+          image_data[imageI], image_data[imageI + 1], image_data[imageI + 2]);
+        imageI += 3;
+      }
+    } else {
+      imageI = rI + (c_index * N_ + N_ - 1) * dimension_;
+      for (auto c = 0; c < N_; ++c) {
+        face_data[r][c] = Vec3f(
+          image_data[imageI], image_data[imageI + 1], image_data[imageI + 2]);
+        imageI -= 3;
+      }
+    }
+
+    rI += row_inverse ? -width_ * dimension_ : width_ * dimension_;
+  }
+
+  return std::make_shared<CubeMapFace>(std::move(face_data),
+    center, right_dir, down_dir, size);
+}
+void CubeMap::AppendToLightInfo(const Vec3f &s_point,
+  std::vector<LightInfoToPoint> &infos) const {
+  for (const auto &f : faces_) {
+    f->AppendToLightInfo(s_point, infos);
+  }
+}
 // void CubeMap::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
 //   RayHitObjectRecord rhorT;
 //   for (int i = 0; i < 5; ++i) {
-//     SquareMap *p;
+//     CubeMapFace *p;
 //     if (i == 0) p = this->top;
 //     else if (i == 1) p = this->left;
 //     else if (i == 2) p = this->right;
