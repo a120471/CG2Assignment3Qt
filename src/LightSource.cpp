@@ -21,10 +21,10 @@ void PointLight::AppendToLightInfo(const Vec3f &s_point,
 }
 
 // void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-//   record.hit_point = Vec3f(0, 0, 0);
-//   record.hit_normal = Vec3f(0, 0, 0);
-//   record.r_direction = Vec3f(0, 0, 0);
-//   record.point_color = Vec3f(0, 0, 0);
+//   record.hit_point = Vec3f::Zero();
+//   record.hit_normal = Vec3f::Zero();
+//   record.r_direction = Vec3f::Zero();
+//   record.point_color = Vec3f::Zero();
 //   record.depth = -1;
 // }
 
@@ -56,10 +56,10 @@ void AreaLight::AppendToLightInfo(const Vec3f &s_point,
 // void AreaLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   // todo
 //   return;
-//   // record.hit_point = Vec3f(0, 0, 0);
-//   // record.hit_normal = Vec3f(0, 0, 0);
-//   // record.r_direction = Vec3f(0, 0, 0);
-//   // record.point_color = Vec3f(0, 0, 0);
+//   // record.hit_point = Vec3f::Zero();
+//   // record.hit_normal = Vec3f::Zero();
+//   // record.r_direction = Vec3f::Zero();
+//   // record.point_color = Vec3f::Zero();
 //   // record.depth = -1;
 // }
 
@@ -162,10 +162,10 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //       n = this->normal.cross(e);
 
 //       if (n.dot(n_) < 0) {
-//         rhor.hit_point = Vec3f(0, 0, 0);
-//         rhor.hit_normal = Vec3f(0, 0, 0);
-//         rhor.r_direction = Vec3f(0, 0, 0);
-//         rhor.point_color = Vec3f(0, 0, 0);
+//         rhor.hit_point = Vec3f::Zero();
+//         rhor.hit_normal = Vec3f::Zero();
+//         rhor.r_direction = Vec3f::Zero();
+//         rhor.point_color = Vec3f::Zero();
 //         rhor.depth = -1;
 //         return;
 //       }
@@ -198,10 +198,10 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //     return;
 //   }
 
-//   rhor.hit_point = Vec3f(0, 0, 0);
-//   rhor.hit_normal = Vec3f(0, 0, 0);
-//   rhor.r_direction = Vec3f(0, 0, 0);
-//   rhor.point_color = Vec3f(0, 0, 0);
+//   rhor.hit_point = Vec3f::Zero();
+//   rhor.hit_normal = Vec3f::Zero();
+//   rhor.r_direction = Vec3f::Zero();
+//   rhor.point_color = Vec3f::Zero();
 //   rhor.depth = -1;
 // }
 
@@ -209,6 +209,9 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 CubeMap::CubeMap(const std::string &filepath, float size) {
   hdr_flag_ = stbi_is_hdr(filepath.c_str());
   auto stb_image = stbi_loadf(filepath.c_str(), &width_, &height_, &dimension_, 0);
+  if (stb_image == nullptr) {
+    throw std::runtime_error("cubemap file does not exist");
+  }
   N_ = width_ > height_ ? width_ / 4 : height_ / 4;
 
   if (dimension_ != 3) {

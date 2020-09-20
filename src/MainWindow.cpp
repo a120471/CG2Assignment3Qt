@@ -16,11 +16,11 @@
 #include "Utils.h"
 
 const std::vector<uint32_t> RESOLUTION{400u, 300u};
-const uint32_t MULTI_SAMPLING = 1u;
 const uint32_t IMAGE_SCALE_RATIO = 3u;
 const std::vector<float> CAMERA_POS{0.f, 1.f, 10.f};
 const std::vector<float> LOOKAT{0.f, 0.f, 0.f};
 const QString SCENE_FILE_PATH = QString("/home/dushuai/GitProject/CG2Assignment3Qt/resources/scene.txt");
+const std::string CUBE_MAP_PATH = "/home/dushuai/GitProject/CG2Assignment3Qt/resources/cubemap.hdr";
 
 namespace {
 
@@ -33,7 +33,7 @@ void CreateLights(std::vector<std::shared_ptr<LightBase>> &lights) {
     Vec3f(1.3f, 0.f, 1.f), Vec3f::Ones() * 0.7f));
   lights.emplace_back(std::make_shared<PointLight>(
     Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f) * 1.0f));
-  lights.emplace_back(std::make_shared<CubeMap>("../cubeMap.hdr", 30.1f));
+  lights.emplace_back(std::make_shared<CubeMap>(CUBE_MAP_PATH, 30.1f));
 }
 
 Vec3f QStringListToVec3f(const QStringList &list) {
@@ -108,9 +108,6 @@ void MainWindow::InitUI() {
   resolution_ = new VectorWidget(RESOLUTION, this);
   right_layout->addRow("Resolution", resolution_);
 
-  multi_sampling_ = new NumberWidget(MULTI_SAMPLING, this);
-  right_layout->addRow("Multi Sampling", multi_sampling_);
-
   scale_ratio_ = new NumberWidget(IMAGE_SCALE_RATIO, this);
   right_layout->addRow("Image Scale Ratio", scale_ratio_);
 
@@ -180,13 +177,10 @@ void MainWindow::RenderScene() {
   Vec3f lookat = cam_lookat_vec_->GetValue();
   RenderParams params;
   params.resolution = resolution_->GetValue();
-  params.multi_sampling = multi_sampling_->GetValue();
   params.image_scale_ratio = scale_ratio_->GetValue();
   auto camera = std::make_shared<RayTracingCamera>(
-    cam_pos, lookat, Vec3f(0, 1, 0), params.multi_sampling);
-  camera->SetResolution(params.resolution); // pixel resolution
-  camera->SetWHF(Vec3f(8, 6, 8));  // help to set image center?
-  camera->SetP(camera->getPos() + camera->getFront() * camera->GetWHF()(2));
+    cam_pos, lookat, Vec3f(0.f, 1.f, 0.f));
+  camera->SetK(params.resolution, 90.f);
 
   // render image
   render_button_->setEnabled(false);
@@ -195,109 +189,103 @@ void MainWindow::RenderScene() {
   render_button_->setEnabled(true);
 }
 
-void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
-  int pixel_id, uint32_t resolution_w,
-  std::vector<Vec3f> &pixel_list,
-  const std::vector<std::shared_ptr<GeometryObject>> &scene,
-  const std::vector<std::shared_ptr<LightBase>> &lights) {
-
-  uint32_t row = pixel_id / resolution_w;
-  uint32_t col = pixel_id % resolution_w;
-  std::vector<Ray> rays;
-  camera->GenerateRay(row, col, rays);
-
-  // for each ray inside a pixel
-  RayHitObjectRecord record;
-  pixel_list[pixel_id] = Vec3f();
-  for (const auto &ray : rays) {
-    // find the hit object and hit type
-    int hitType = RayHitTest(ray, scene, lights, record);
-    if (hitType == 1) {
-      pixel_list[pixel_id] += calColorOnHitPoint(record, scene, lights, 1);
-    }
-    else if (hitType == 2) {
-      pixel_list[pixel_id] += record.point_color;
-    }
-  }
-
-  pixel_list[pixel_id] /= camera->GetRayNumEachPixel();
-}
-
 void MainWindow::RenderImage(const RenderParams &params,
     const std::vector<std::shared_ptr<GeometryObject>> &scene,
     const std::shared_ptr<RayTracingCamera> &camera,
     const std::vector<std::shared_ptr<LightBase>> &lights) {
-  const clock_t begin_time = clock();
+  const clock_t s_time = clock();
 
   const auto &resolution = camera->GetResolution();
 
-  // Create a new image
+  // Create image
   std::shared_ptr<QImage> q_image = std::make_shared<QImage>(
     resolution(0) * params.image_scale_ratio,
     resolution(1) * params.image_scale_ratio,
     QImage::Format_RGB888);
 
-  // Save rendered pixels, we need to scale them later for visualization
+  // Rendered pixels
   int pixel_num = resolution(0) * resolution(1);
-  std::vector<float> pixel_Rs(pixel_num);
-  std::vector<float> pixel_Gs(pixel_num);
-  std::vector<float> pixel_Bs(pixel_num);
-  std::vector<Vec3f> pixel_list(pixel_num);
+  std::vector<Vec3f> rgbs(pixel_num);
 
-  float brightest = 0.01f;
   tbb::parallel_for (tbb::blocked_range<int>(0, pixel_num),
     [&](tbb::blocked_range<int> r) {
     for (int i = r.begin(); i < r.end(); ++i) {
-      RenderPixels(camera, i, resolution(0), pixel_list, scene, lights);
+      RenderPixels(camera, i, resolution(0), rgbs, scene, lights);
 
-      pixel_Rs[i] = pixel_list[i][0];
-      pixel_Gs[i] = pixel_list[i][1];
-      pixel_Bs[i] = pixel_list[i][2];
-      mutex.lock();
-      brightest = std::max(brightest, pixel_Rs[i]);
-      brightest = std::max(brightest, pixel_Gs[i]);
-      brightest = std::max(brightest, pixel_Bs[i]);
-      mutex.unlock();
-
+      // mutex.lock();
       // rendered_image_->setPixmap(QPixmap::fromImage(q_image));
       // rendered_image_->repaint();
       // QCoreApplication::processEvents();
+      // mutex.unlock();
     }
   });
 
-  // calculate the scale ratio
-  int nthIdx = (int)(pixel_num * NTHIDX) - 1;
-  nth_element(pixel_Rs.begin(), pixel_Rs.begin() + nthIdx, pixel_Rs.end());
-  nth_element(pixel_Gs.begin(), pixel_Gs.begin() + nthIdx, pixel_Gs.end());
-  nth_element(pixel_Bs.begin(), pixel_Bs.begin() + nthIdx, pixel_Bs.end());
+  // calculate a factor to tune rgb value
+  int nth_idx = (int)(pixel_num * NTHIDX) - 1;
+  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+    [](const Vec3f &a, const Vec3f &b) {
+      return a(0) < b(0);
+    });
+  float max_radiance = std::max(0.01f, rgbs[nth_idx](0));
+  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+    [](const Vec3f &a, const Vec3f &b) {
+      return a(1) < b(1);
+    });
+  max_radiance = std::max(max_radiance, rgbs[nth_idx](1));
+  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+    [](const Vec3f &a, const Vec3f &b) {
+      return a(2) < b(2);
+    });
+  max_radiance = std::max(max_radiance, rgbs[nth_idx](2));
+  float scale = 255.0f / max_radiance;
 
-  float maxRadiance = std::max(0.01f, pixel_Rs[nthIdx]);
-  maxRadiance = std::max(maxRadiance, pixel_Gs[nthIdx]);
-  maxRadiance = std::max(maxRadiance, pixel_Bs[nthIdx]);
-  float scale = 255.0f / maxRadiance;
-
-  int arrayIdx = 0;
+  int i = 0;
   for (int row = 0; row < resolution(1); ++row) {
     for (int col = 0; col < resolution(0); ++col) {
-      pixel_list[arrayIdx] *= scale;
-      int R = std::min((int)pixel_list[arrayIdx][0], 255);
-      int G = std::min((int)pixel_list[arrayIdx][1], 255);
-      int B = std::min((int)pixel_list[arrayIdx][2], 255);
+      rgbs[i] *= scale;
+      int R = (int)std::min(rgbs[i][0], 255.f);
+      int G = (int)std::min(rgbs[i][1], 255.f);
+      int B = (int)std::min(rgbs[i][2], 255.f);
       for (int rowI = 0; rowI < params.image_scale_ratio; ++rowI) {
         for (int colI = 0; colI < params.image_scale_ratio; ++colI) {
-          q_image->setPixel(col * params.image_scale_ratio + colI, row * params.image_scale_ratio + rowI, qRgb(R, G, B));
+          q_image->setPixel(col * params.image_scale_ratio + colI,
+            row * params.image_scale_ratio + rowI, qRgb(R, G, B));
         }
       }
 
-      ++arrayIdx;
+      ++i;
     }
   }
 
-  float timeEllapse = float(clock() - begin_time) / CLOCKS_PER_SEC;
-
   // display the image
+  float delta_time = float(clock() - s_time) / CLOCKS_PER_SEC;
   rendered_image_->setPixmap(QPixmap::fromImage(*(q_image.get())));
-  render_time_->setText(QString("Time: %1s").arg(timeEllapse));
+  render_time_->setText(QString("Time: %1s").arg(delta_time));
+}
+
+void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
+  int pixel_id, uint32_t resolution_w,
+  std::vector<Vec3f> &rgbs,
+  const std::vector<std::shared_ptr<GeometryObject>> &scene,
+  const std::vector<std::shared_ptr<LightBase>> &lights) {
+
+  uint32_t row = pixel_id / resolution_w;
+  uint32_t col = pixel_id % resolution_w;
+  Ray ray;
+  camera->GenerateRay(row, col, ray);
+
+  // for each ray inside a pixel
+  RayHitObjectRecord record;
+  rgbs[pixel_id] = Vec3f();
+
+  // find the hit object and hit type
+  int hitType = RayHitTest(ray, scene, lights, record);
+  if (hitType == 1) {
+    rgbs[pixel_id] += calColorOnHitPoint(record, scene, lights, 1);
+  }
+  else if (hitType == 2) {
+    rgbs[pixel_id] += record.point_color;
+  }
 }
 
 int MainWindow::RayHitTest(const Ray &ray,
@@ -307,15 +295,15 @@ int MainWindow::RayHitTest(const Ray &ray,
 
   record.depth = -1;
   int hitType = 0;
-  RayHitObjectRecord tmpRecord;
+  RayHitObjectRecord tmp_record;
 
   for (auto object : scene) {
-    object->RayIntersection(ray, tmpRecord);
-    if (tmpRecord.depth - lightDis > -MYEPSILON) { // the object is further than the light source
+    object->RayIntersection(ray, tmp_record);
+    if (tmp_record.depth - lightDis > -MYEPSILON) { // the object is further than the light source
       continue;
     }
-    if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
-      record = tmpRecord;
+    if (tmp_record.depth > MYEPSILON && (record.depth > tmp_record.depth || record.depth < MYEPSILON)) {
+      record = tmp_record;
       hitType = 1;
     }
     if (lightDis != MYINFINITE && hitType != 0) {
@@ -324,9 +312,9 @@ int MainWindow::RayHitTest(const Ray &ray,
   }
   // if (lightDis == MYINFINITE) {
   //   for (auto light : lights) {
-  //     light->RayIntersection(ray, tmpRecord);
-  //     if (tmpRecord.depth > MYEPSILON && (record.depth > tmpRecord.depth || record.depth < MYEPSILON)) {
-  //       record = tmpRecord;
+  //     light->RayIntersection(ray, tmp_record);
+  //     if (tmp_record.depth > MYEPSILON && (record.depth > tmp_record.depth || record.depth < MYEPSILON)) {
+  //       record = tmp_record;
   //       hitType = 2;
   //     }
   //   }
@@ -385,7 +373,7 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
   Vec3f returnColor = Vec3f(0);
   returnColor += diffuse / (float)infos.size() + specular;
   //if (1 == level)
-  //  returnColor = Vec3f(0, 0, 0);
+  //  returnColor = Vec3f::Zero();
 
   returnColor += reflectionColor;
 

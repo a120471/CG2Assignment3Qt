@@ -23,6 +23,7 @@ template<typename Scalar>
 NumberWidget<Scalar>::NumberWidget(Scalar value, QWidget *parent)
   : QLineEdit(parent) {
 
+  this->setText(QString::number(value));
   SetValidator();
 }
 

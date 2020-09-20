@@ -11,10 +11,6 @@ class Ray;
 
 // saved data of each hit point and reflection direction
 struct RayHitObjectRecord {
-  RayHitObjectRecord(float depth = -1) {
-    this->depth = depth;
-  }
-
   RayHitObjectRecord& operator=(const RayHitObjectRecord& record) {
     if (this == &record) {
       return *this;
@@ -28,7 +24,7 @@ struct RayHitObjectRecord {
     return *this;
   }
 
-  float depth;
+  float depth{-1.f};
   Vec3f hit_point;
   Vec3f hit_normal;
   Vec3f r_direction;
@@ -39,30 +35,25 @@ struct RayHitObjectRecord {
 // Base class
 class GeometryObject {
 public:
-  GeometryObject(const std::string &typeName, const Vec3f &color);
+  GeometryObject(const std::string &type_name, const Vec3f &color);
   virtual ~GeometryObject() = default;
 
   virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
 
-  // we need to save the bounding box to accerlerate the ray hit test
-  virtual void GetBoundingBox(Vec3f &AA, Vec3f &BB) = 0;
+  // use bounding box to accerlerate the ray hit test
+  virtual void GetBoundingBox(Vec3f &AA, Vec3f &BB);
 
-  // void getMaterial();
-
-  std::string typeName_;
+  std::string type_name_;
   Vec3f color_;
   Vec3f AA_, BB_; // bounding box
-  //Mat4f transformMatrix;
 };
 
 class Sphere : public GeometryObject {
 public:
   Sphere(const Vec3f &center, float radius,
-    const Vec3f &color = Vec3f(1, 1, 1));
+    const Vec3f &color = Vec3f::Ones());
 
   void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
-
-  void GetBoundingBox(Vec3f &AA, Vec3f &BB) override;
 
 private:
   Vec3f center_;
@@ -71,13 +62,9 @@ private:
 
 class Plane : public GeometryObject {
 public:
-  Plane(const Vec4f &ABCD, const Vec3f &color = Vec3f(1, 1, 1));
+  Plane(const Vec4f &ABCD, const Vec3f &color = Vec3f::Ones());
 
   void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
-
-  void GetBoundingBox(Vec3f &AA, Vec3f &BB) override;
-
-  Vec3f normal_;
 
 private:
   // Ax + By + Cz + D = 0;
@@ -87,67 +74,50 @@ private:
 class Triangle : public GeometryObject {
 public:
   struct Vertex {
-    Vec3f Position;
-    Vec3f Normal;
+    Vec3f position;
+    Vec3f normal;
   };
 
   Triangle(const Vertex &A, const Vertex &B, const Vertex &C,
-    Vec3f color = Vec3f(1, 1, 1));
+    Vec3f color = Vec3f::Ones());
 
   void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
 
-  void GetBoundingBox(Vec3f &AA, Vec3f &BB) override;
-
-  Vec3f baryCenter_;
+  const Vec3f &GetBaryCenter() const;
 
 private:
   Vertex A_, B_, C_;
   Vec3f eAB_, eAC_;
+  Vec3f bary_center_;
 };
 
 class Mesh : public GeometryObject {
 public:
   Mesh(const std::vector<Triangle::Vertex> &vertices,
     const std::vector<int> &indices,
-    const Vec3f &color = Vec3f(1, 1, 1));
-  virtual ~Mesh();
+    const Vec3f &color = Vec3f::Ones());
 
   void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
 
   void HitTree(const Ray &ray, KDTree::TreeNode *node, RayHitObjectRecord &record);
 
-  void GetBoundingBox(Vec3f &AA, Vec3f &BB) override { /*to do*/ }
-
-  inline static bool SortByX(const Triangle *t1, const Triangle *t2) {
-    return t1->baryCenter_[0] < t2->baryCenter_[0];
-  }
-  inline static bool SortByY(const Triangle *t1, const Triangle *t2) {
-    return t1->baryCenter_[1] < t2->baryCenter_[1];
-  }
-  inline static bool SortByZ(const Triangle *t1, const Triangle *t2) {
-    return t1->baryCenter_[2] < t2->baryCenter_[2];
-  }
-
 private:
-  std::vector<Triangle*> faceTriangles_;
-  KDTree *sKDT_;
+  std::vector<std::shared_ptr<Triangle>> triangles_;
+  std::shared_ptr<KDTree> tree_;
 };
 
 class Model : public GeometryObject {
 public:
-  Model(const std::string &modelPath,
-    const Vec3f &color = Vec3f(1, 1, 1));
-  virtual ~Model();
+  Model(const std::string &filepath,
+    const Vec3f &color = Vec3f::Ones());
 
   void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
 
-  void GetBoundingBox(Vec3f &AA, Vec3f &BB) override { /*to do*/ }
-
 private:
-  void processNode(aiNode* node, const aiScene* scene);
-  Mesh* processMesh(aiMesh* mesh, const aiScene* scene);
+  void ProcessNode(aiNode *node, const aiScene *scene);
+  std::shared_ptr<Mesh> CreateMesh(aiMesh *mesh, const aiScene *scene);
 
-  std::vector<Mesh*> meshes_;
+  std::vector<std::shared_ptr<Mesh>> meshes_;
 };
 
 }

@@ -12,64 +12,38 @@ Ray::Ray(const Vec3f &origin_point, const Vec3f &dir)
 RayTracingCamera::RayTracingCamera(
   const Vec3f &pos,
   const Vec3f &lookat,
-  const Vec3f &up,
-  int multi_samling_level_)
-  : pos_(pos) {
-  front_ = (lookat - pos).normalized();
-  up_ = up.normalized();
+  const Vec3f &up) {
 
-  ir_ = front_.cross(up_).normalized();
-  id_ = front_.cross(ir_).normalized();
-  has_pixel_size_ = false;
+  auto z_dir = (pos - lookat).normalized();
+  auto x_dir = up.cross(z_dir).normalized();
+  auto y_dir = z_dir.cross(x_dir).normalized();
 
-  multi_samling_level_ = (int)sqrt(multi_samling_level_);
+  camera_frame_ << x_dir(0), y_dir(0), z_dir(0), pos(0),
+                   x_dir(1), y_dir(1), z_dir(1), pos(1),
+                   x_dir(2), y_dir(2), z_dir(2), pos(2),
+                   0.f, 0.f, 0.f, 1.f;
 }
 
-// row and col start from 0
-void RayTracingCamera::GenerateRay(int row, int col, std::vector<Ray> &rays) {
-  if (!has_pixel_size_) {
-    has_pixel_size_ = true;
-    pixel_width_ = whf_(0) / resolution_(0);
-    pixel_height_ = whf_(1) / resolution_(1);
-  }
+void RayTracingCamera::SetK(const Vec2u &resolution, float fov_h) {
+  resolution_ = resolution;
 
-  Vec3f colOffset = Vec3f(ir_ * (col - (resolution_(0) - 1.0f) / 2)) * pixel_width_;
-  Vec3f rowOffset = Vec3f(id_ * (row - (resolution_(1) - 1.0f) / 2)) * pixel_height_;
-  Vec3f ePoint = p_ + colOffset + rowOffset;
-
-  rays.clear();
-  float step = 1.0f / (multi_samling_level_ + 1);
-  for (int i = 1; i <= multi_samling_level_; ++i) {
-    for (int j = 1; j <= multi_samling_level_; ++j) {
-      Vec3f colOffsetLocal = Vec3f(ir_ * (i * step - 0.5f)) * pixel_width_;
-      Vec3f rowOffsetLocal = Vec3f(id_ * (j * step - 0.5f)) * pixel_height_;
-
-      Vec3f directionLocal = (ePoint + colOffsetLocal + rowOffsetLocal - pos_).normalized();
-      rays.emplace_back(pos_, directionLocal);
-    }
-  }
+  float focal = (resolution_(0) / 2.f) / tan(fov_h / 2.f);
+  K_ << focal, 0.f, resolution_(0) - 1.f - 0.5f,
+        0.f, focal, resolution_(1) / 2.f - 0.5f,
+        0.f, 0.f, 1.f;
 }
 
 const Vec2u &RayTracingCamera::GetResolution() {
   return resolution_;
 }
 
-void RayTracingCamera::SetResolution(const Vec2u &resolution) {
-  resolution_ = resolution;
-  has_pixel_size_ = false;
-}
+// row and col start from 0
+void RayTracingCamera::GenerateRay(int row, int col, Ray &ray) {
 
-const Vec3f &RayTracingCamera::GetWHF() {
-  return whf_;
-}
+  Vec3f local_ray = K_.inverse() * Vec3f(col, row, 1.f);
 
-void RayTracingCamera::SetWHF(const Vec3f &whf) {
-  whf_ = whf;
-  has_pixel_size_ = false;
-}
-
-int RayTracingCamera::GetRayNumEachPixel() {
-  return multi_samling_level_ * multi_samling_level_;
+  ray.s_point = camera_frame_.col(3).head(3);
+  ray.direction = (camera_frame_.block<3, 3>(0, 0) * local_ray).normalized();
 }
 
 }

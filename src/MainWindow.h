@@ -55,7 +55,6 @@ private:
   QLabel *render_time_;
 
   VectorWidget<uint32_t> *resolution_;
-  NumberWidget<uint32_t> *multi_sampling_;
   NumberWidget<uint32_t> *scale_ratio_;
 
   VectorWidget<float> *cam_pos_vec_;

@@ -1,17 +1,21 @@
 #include "GeometryObject.h"
 #include <assimp/Importer.hpp>
-#include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <Eigen/Geometry>
 #include "Utils.h"
 
 namespace ray_tracing {
 
-GeometryObject::GeometryObject(const std::string &typeName,
+GeometryObject::GeometryObject(const std::string &type_name,
   const Vec3f &color)
-  : typeName_(typeName)
+  : type_name_(type_name)
   , color_(color) {
 }
+void GeometryObject::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
+  AA = AA_;
+  BB = BB_;
+}
+
 
 Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   : GeometryObject("sphere", color)
@@ -24,6 +28,7 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   Vec3f sc = ray.s_point - center_;
   Vec3f d = ray.direction;
 
+  // (s_point + d * t - center) ^ 2 == radius ^ 2
   // At^2 + Bt + C = 0, solve t
   float A = d.squaredNorm();
   float B = 2 * d.dot(sc);
@@ -52,28 +57,24 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
     }
   }
 
-  rhor.hit_point = Vec3f(0, 0, 0);
-  rhor.hit_normal = Vec3f(0, 0, 0);
-  rhor.r_direction = Vec3f(0, 0, 0);
-  rhor.point_color = Vec3f(0, 0, 0);
-  rhor.depth = -1;
-}
-void Sphere::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
-  AA = AA;
-  BB = BB;
+  rhor.hit_point = Vec3f::Zero();
+  rhor.hit_normal = Vec3f::Zero();
+  rhor.r_direction = Vec3f::Zero();
+  rhor.point_color = Vec3f::Zero();
+  rhor.depth = -1.f;
 }
 
 
 Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   : GeometryObject("plane", color)
-  , ABCD_(ABCD)
-  , normal_(ABCD.head<3>().normalized()) {
+  , ABCD_(ABCD) {
   AA_ = Vec3f::Ones() * -MYINFINITE;
   BB_ = Vec3f::Ones() * MYINFINITE;
 }
 void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   Vec3f sp = ray.s_point;
   Vec3f d = ray.direction;
+  auto normal = ABCD_.head<3>().normalized();
 
   float denominator = ABCD_.head<3>().dot(d);
   float numerator = -ABCD_[3] - ABCD_.head<3>().dot(sp);
@@ -81,43 +82,36 @@ void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   float t = numerator / denominator;
   if (t > MYEPSILON) {
     rhor.hit_point = ray.GetPoint(t);
-    rhor.hit_normal = normal_;
+    rhor.hit_normal = normal;
     rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
     rhor.point_color = color_;
     rhor.depth = t;
     return;
   }
 
-  rhor.hit_point = Vec3f(0, 0, 0);
-  rhor.hit_normal = Vec3f(0, 0, 0);
-  rhor.r_direction = Vec3f(0, 0, 0);
-  rhor.point_color = Vec3f(0, 0, 0);
-  rhor.depth = -1;
-}
-void Plane::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
-  AA = AA;
-  BB = BB;
+  rhor.hit_point = Vec3f::Zero();
+  rhor.hit_normal = Vec3f::Zero();
+  rhor.r_direction = Vec3f::Zero();
+  rhor.point_color = Vec3f::Zero();
+  rhor.depth = -1.f;
 }
 
-Triangle::Triangle(const Vertex &A, const Vertex &B, const Vertex &C, Vec3f color)
+
+Triangle::Triangle(const Vertex &A,
+  const Vertex &B, const Vertex &C, Vec3f color)
   : GeometryObject("triangle", color)
   , A_(A)
   , B_(B)
   , C_(C) {
-  AA_[0] = std::min(std::min(A_.Position[0], B_.Position[0]), C_.Position[0]);
-  AA_[1] = std::min(std::min(A_.Position[1], B_.Position[1]), C_.Position[1]);
-  AA_[2] = std::min(std::min(A_.Position[2], B_.Position[2]), C_.Position[2]);
+  AA_ = A_.position.cwiseMin(B_.position).cwiseMin(C_.position);
+  BB_ = A_.position.cwiseMax(B_.position).cwiseMax(C_.position);
 
-  BB_[0] = std::max(std::max(A_.Position[0], B_.Position[0]), C_.Position[0]);
-  BB_[1] = std::max(std::max(A_.Position[1], B_.Position[1]), C_.Position[1]);
-  BB_[2] = std::max(std::max(A_.Position[2], B_.Position[2]), C_.Position[2]);
-
-  baryCenter_ = (A_.Position + B_.Position + C_.Position) / 3.0f;
-  eAB_ = B_.Position - A_.Position;
-  eAC_ = C_.Position - A_.Position;
+  bary_center_ = (A_.position + B_.position + C_.position) / 3.0f;
+  eAB_ = B_.position - A_.position;
+  eAC_ = C_.position - A_.position;
 }
 void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-  Vec3f s = ray.s_point - A_.Position;
+  Vec3f s = ray.s_point - A_.position;
   Vec3f d = ray.direction;
 
   float denominator = d.cross(eAC_).dot(eAB_);
@@ -127,7 +121,7 @@ void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   float t = eAB_.cross(eAC_).dot(s) / denominator;
   if (t > MYEPSILON && b1 > -MYEPSILON && b2 > -MYEPSILON && b1 + b2 < 1 + MYEPSILON) {
     rhor.hit_point = ray.GetPoint(t);
-    rhor.hit_normal = ((1 - b1 - b2) * A_.Normal + b1 * B_.Normal + b2 * C_.Normal).normalized();
+    rhor.hit_normal = ((1 - b1 - b2) * A_.normal + b1 * B_.normal + b2 * C_.normal).normalized();
     //rhor.hit_normal = eAB_.cross(eAC_).normalized();
     rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
     rhor.point_color = color_;
@@ -135,131 +129,123 @@ void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
     return;
   }
 
-  rhor.hit_point = Vec3f(0, 0, 0);
-  rhor.hit_normal = Vec3f(0, 0, 0);
-  rhor.r_direction = Vec3f(0, 0, 0);
-  rhor.point_color = Vec3f(0, 0, 0);
-  rhor.depth = -1;
+  rhor.hit_point = Vec3f::Zero();
+  rhor.hit_normal = Vec3f::Zero();
+  rhor.r_direction = Vec3f::Zero();
+  rhor.point_color = Vec3f::Zero();
+  rhor.depth = -1.f;
 }
-void Triangle::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
-  AA = AA;
-  BB = BB;
+const Vec3f &Triangle::GetBaryCenter() const {
+  return bary_center_;
 }
 
-Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices, const std::vector<int> &faces, const Vec3f &color)
-  : GeometryObject("Mesh", color)
-  , sKDT_(nullptr) {
-  faceTriangles_.clear();
-  for (int i = 0; i < faces.size(); i += 3) {
-    faceTriangles_.emplace_back(new Triangle(vertices[faces[i]], vertices[faces[i + 1]], vertices[faces[i + 2]], color));
+
+Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices,
+  const std::vector<int> &faces, const Vec3f &color)
+  : GeometryObject("mesh", color) {
+  triangles_.clear();
+  for (auto i = 0; i < faces.size(); i += 3) {
+    triangles_.emplace_back(std::make_shared<Triangle>(vertices[faces[i]],
+      vertices[faces[i + 1]], vertices[faces[i + 2]], color));
   }
 
-  sKDT_ = new KDTree(faceTriangles_);
-}
-Mesh::~Mesh() {
-  for (std::vector<Triangle*>::iterator i = faceTriangles_.begin(); i != faceTriangles_.end(); ++i) {
-    SafeDelete(*i);
-  }
-  SafeDelete(sKDT_);
+  tree_ = std::make_shared<KDTree>(triangles_);
 }
 void Mesh::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
-  KDTree::TreeNode* node = sKDT_->rootNode;
+  KDTree::TreeNode *node = tree_->GetRootNode();
   HitTree(ray, node, rhor);
 }
-void Mesh::HitTree(const Ray &ray, KDTree::TreeNode* node, RayHitObjectRecord &rhor) {
+void Mesh::HitTree(const Ray &ray, KDTree::TreeNode *node,
+  RayHitObjectRecord &rhor) {
   if (RayHitAABB(ray, node->AA, node->BB)) {
-    if (node->triangleIdx.size() > 0) {
+    if (!node->face_ids.empty()) {
       RayHitObjectRecord rhorT;
-      for (std::vector<int>::iterator i = node->triangleIdx.begin(); i != node->triangleIdx.end(); ++i) {
-        faceTriangles_[*i]->RayIntersection(ray, rhorT);
-        if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON)) {
+      for (auto i = node->face_ids.begin(); i != node->face_ids.end(); ++i) {
+        triangles_[*i]->RayIntersection(ray, rhorT);
+        if (rhorT.depth > MYEPSILON &&
+          (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON)) {
           rhor = rhorT;
         }
       }
-    }
-    else {
-      HitTree(ray, node->lChild, rhor);
-      HitTree(ray, node->rChild, rhor);
+    } else {
+      HitTree(ray, node->l_child, rhor);
+      HitTree(ray, node->r_child, rhor);
     }
   }
 }
 
-Model::Model(const std::string &modelPath, const Vec3f &color)
-  : GeometryObject("Model", color) {
+
+Model::Model(const std::string &filepath, const Vec3f &color)
+  : GeometryObject("model", color) {
   srand(time(0));
 
   Assimp::Importer importer;
-  const aiScene* scene = importer.ReadFile(modelPath, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
-    aiProcess_FlipUVs | aiProcess_GenNormals | aiProcess_SplitLargeMeshes | aiProcess_OptimizeMeshes);
+  const aiScene *scene = importer.ReadFile(filepath,
+    aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
+    aiProcess_FlipUVs | aiProcess_GenNormals |
+    aiProcess_SplitLargeMeshes | aiProcess_OptimizeMeshes);
 
-  if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+  if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE ||
+    !scene->mRootNode) {
     //std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
     return;
   }
 
   meshes_.clear();
-  processNode(scene->mRootNode, scene);
-}
-Model::~Model() {
-  for (std::vector<Mesh*>::iterator i = meshes_.begin(); i != meshes_.end(); ++i) {
-    SafeDelete(*i);
-  }
+  ProcessNode(scene->mRootNode, scene);
 }
 void Model::RayIntersection(const Ray &Ray, RayHitObjectRecord &rhor) {
   RayHitObjectRecord rhorT;
-  for (unsigned int i = 0; i < meshes_.size(); ++i) {
+  for (auto i = 0; i < meshes_.size(); ++i) {
     meshes_[i]->RayIntersection(Ray, rhorT);
     if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON)) {
       rhor = rhorT;
     }
   }
 }
-void Model::processNode(aiNode* node, const aiScene* scene) {
-  // Process all the node's meshes_ (if any)
-  for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
-    aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-    meshes_.emplace_back(processMesh(mesh, scene));
+void Model::ProcessNode(aiNode *node, const aiScene *scene) {
+  // Process all the node's meshes (if any)
+  for (auto i = 0; i < node->mNumMeshes; ++i) {
+    aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+    meshes_.emplace_back(CreateMesh(mesh, scene));
   }
   // Then do the same for each of its children
-  for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-    processNode(node->mChildren[i], scene);
+  for (auto i = 0; i < node->mNumChildren; ++i) {
+    ProcessNode(node->mChildren[i], scene);
   }
 }
-Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene) {
+std::shared_ptr<Mesh> Model::CreateMesh(aiMesh *mesh, const aiScene *scene) {
   std::vector<Triangle::Vertex> vertices;
   std::vector<int> faces;
 
   vertices.resize(mesh->mNumVertices);
-  for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
+  for (auto i = 0; i < mesh->mNumVertices; ++i) {
     Triangle::Vertex vertex;
-    // Process vertex positions, normals and texture coordinates
 
-    Vec3f vector;
-    // Positions
-    vector << mesh->mVertices[i].x,
+    vertex.position << mesh->mVertices[i].x,
       mesh->mVertices[i].y,
       mesh->mVertices[i].z;
-    vertex.Position = vector;
-    // Normals
-    vector << mesh->mNormals[i].x,
+
+    vertex.normal << mesh->mNormals[i].x,
       mesh->mNormals[i].y,
       mesh->mNormals[i].z;
-    vertex.Normal = vector;
 
     vertices[i] = vertex;
   }
   // Process faces
   faces.resize(3 * mesh->mNumFaces);
-  for (unsigned int i = 0, i1 = 0; i < mesh->mNumFaces; ++i) {
+  for (auto i = 0, i1 = 0; i < mesh->mNumFaces; ++i) {
     aiFace face = mesh->mFaces[i];
     // Retrieve all indices of the face and store them in the indices vector
-    for (unsigned int j = 0; j < face.mNumIndices; ++j) {
+    for (auto j = 0; j < face.mNumIndices; ++j) {
       faces[i1++] = face.mIndices[j];
     }
   }
 
-  //return new Mesh(vertices, faces, color);
-  return new Mesh(vertices, faces, Vec3f(static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX, static_cast<float>(rand()) / RAND_MAX));
+  return std::make_shared<Mesh>(vertices, faces,
+    Vec3f(static_cast<float>(rand()) / RAND_MAX,
+      static_cast<float>(rand()) / RAND_MAX,
+      static_cast<float>(rand()) / RAND_MAX));
 }
 
 }
