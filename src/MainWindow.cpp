@@ -30,7 +30,7 @@ std::mutex mutex;
 
 void CreateLights(std::vector<std::shared_ptr<LightBase>> &lights) {
   lights.emplace_back(std::make_shared<PointLight>(
-    Vec3f(1.3f, 0.f, 1.f), Vec3f::Ones() * 0.7f));
+    Vec3f(1.3f, 0.f, 1.f), Vec3f::Constant(0.7f));
   lights.emplace_back(std::make_shared<PointLight>(
     Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f) * 1.0f));
   lights.emplace_back(std::make_shared<CubeMap>(CUBE_MAP_PATH, 30.1f));

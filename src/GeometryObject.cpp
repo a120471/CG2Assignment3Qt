@@ -21,8 +21,8 @@ Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   : GeometryObject("sphere", color)
   , center_(center)
   , radius_(radius) {
-  AA_ = center_ - Vec3f::Ones() * radius_;
-  BB_ = center_ + Vec3f::Ones() * radius_;
+  AA_ = center_ - Vec3f::Constant(radius_);
+  BB_ = center_ + Vec3f::Constant(radius_);
 }
 void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   Vec3f sc = ray.s_point - center_;
@@ -68,8 +68,8 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
 Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   : GeometryObject("plane", color)
   , ABCD_(ABCD) {
-  AA_ = Vec3f::Ones() * -MYINFINITE;
-  BB_ = Vec3f::Ones() * MYINFINITE;
+  AA_ = Vec3f::Constant(-MYINFINITE);
+  BB_ = Vec3f::Constant(MYINFINITE);
 }
 void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   Vec3f sp = ray.s_point;

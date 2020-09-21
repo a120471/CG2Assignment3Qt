@@ -118,8 +118,8 @@ static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
 
 // bool VoxelNode::CalculateRayHit(const Vec3f &ray_o, const Vec3f &normalized_d,
 //   float &near_distance) const {
-//   Vec3f min_corner = center_ - Vec3f::Ones() * side_len_;
-//   Vec3f max_corner = center_ + Vec3f::Ones() * side_len_;
+//   Vec3f min_corner = center_ - Vec3f::Constant(side_len_);
+//   Vec3f max_corner = center_ + Vec3f::Constant(side_len_);
 //   Vec3f min_dc = min_corner - ray_o;
 //   Vec3f max_dc = max_corner - ray_o;
 //   float max_tmin = -std::numeric_limits<float>::max();
