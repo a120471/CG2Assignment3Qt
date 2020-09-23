@@ -134,7 +134,7 @@ static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
 //       }
 //       max_tmin = std::max(max_tmin, t1);
 //       min_tmax = std::min(min_tmax, t2);
-//     } else if (min_dc(i) * max_dc(i) > 0) {
+//     } else if (min_dc(i) * max_dc(i) > EPSILON) {
 //       return false;
 //     }
 //   }
