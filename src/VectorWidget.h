@@ -47,7 +47,7 @@ void VectorWidget<Scalar>::SetValidator() {
       w->setValidator(new QIntValidator(w));
     } else if (std::is_same<Scalar, uint32_t>::value) {
       w->setValidator(new QIntValidator(
-        0, std::numeric_limits<uint32_t>::max(), w));
+        0, std::numeric_limits<int32_t>::max(), w));
     } else if (std::is_same<Scalar, float>::value) {
       w->setValidator(new QDoubleValidator(w));
     } else if (std::is_same<Scalar, double>::value) {

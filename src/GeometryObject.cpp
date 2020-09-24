@@ -24,7 +24,7 @@ Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   AA_ = center_ - Vec3f::Constant(radius_);
   BB_ = center_ + Vec3f::Constant(radius_);
 }
-void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   Vec3f sc = ray.s_point - center_;
   Vec3f d = ray.direction;
 
@@ -34,34 +34,33 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   float B = 2 * d.dot(sc);
   float C = sc.squaredNorm() - radius_*radius_;
 
-  float det = B*B - 4 * A*C;
+  float det = B * B - 4 * A * C;
   if (det > MYEPSILON) {
     float t1 = (-B - sqrt(det)) / (2 * A);
     float t2 = (-B + sqrt(det)) / (2 * A);
 
     if (t1 > MYEPSILON) {
-      rhor.hit_point = ray.GetPoint(t1);
-      rhor.hit_normal = (rhor.hit_point - center_).normalized();
-      rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
-      rhor.point_color = color_;
-      rhor.depth = t1;
+      record.hit_point = ray.GetPoint(t1);
+      record.hit_normal = (record.hit_point - center_).normalized();
+      record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+      record.point_color = color_;
+      record.depth = t1;
       return;
-    }
-    else if (t2 > MYEPSILON) {
-      rhor.hit_point = ray.GetPoint(t2);
-      rhor.hit_normal = (rhor.hit_point - center_).normalized();
-      rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
-      rhor.point_color = color_;
-      rhor.depth = t2;
+    } else if (t2 > MYEPSILON) {
+      record.hit_point = ray.GetPoint(t2);
+      record.hit_normal = (record.hit_point - center_).normalized();
+      record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+      record.point_color = color_;
+      record.depth = t2;
       return;
     }
   }
 
-  rhor.hit_point = Vec3f::Zero();
-  rhor.hit_normal = Vec3f::Zero();
-  rhor.r_direction = Vec3f::Zero();
-  rhor.point_color = Vec3f::Zero();
-  rhor.depth = -1.f;
+  record.hit_point = Vec3f::Zero();
+  record.hit_normal = Vec3f::Zero();
+  record.r_direction = Vec3f::Zero();
+  record.point_color = Vec3f::Zero();
+  record.depth = -1.f;
 }
 
 
@@ -71,29 +70,29 @@ Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   AA_ = Vec3f::Constant(-MYINFINITE);
   BB_ = Vec3f::Constant(MYINFINITE);
 }
-void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   Vec3f sp = ray.s_point;
   Vec3f d = ray.direction;
-  auto normal = ABCD_.head<3>().normalized();
 
   float denominator = ABCD_.head<3>().dot(d);
-  float numerator = -ABCD_[3] - ABCD_.head<3>().dot(sp);
+  float numerator = -ABCD_(3) - ABCD_.head<3>().dot(sp);
 
   float t = numerator / denominator;
   if (t > MYEPSILON) {
-    rhor.hit_point = ray.GetPoint(t);
-    rhor.hit_normal = normal;
-    rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
-    rhor.point_color = color_;
-    rhor.depth = t;
+    auto normal = ABCD_.head<3>().normalized();
+    record.hit_point = ray.GetPoint(t);
+    record.hit_normal = normal;
+    record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+    record.point_color = color_;
+    record.depth = t;
     return;
   }
 
-  rhor.hit_point = Vec3f::Zero();
-  rhor.hit_normal = Vec3f::Zero();
-  rhor.r_direction = Vec3f::Zero();
-  rhor.point_color = Vec3f::Zero();
-  rhor.depth = -1.f;
+  record.hit_point = Vec3f::Zero();
+  record.hit_normal = Vec3f::Zero();
+  record.r_direction = Vec3f::Zero();
+  record.point_color = Vec3f::Zero();
+  record.depth = -1.f;
 }
 
 
@@ -110,7 +109,7 @@ Triangle::Triangle(const Vertex &A,
   eAB_ = B_.position - A_.position;
   eAC_ = C_.position - A_.position;
 }
-void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   Vec3f s = ray.s_point - A_.position;
   Vec3f d = ray.direction;
 
@@ -120,20 +119,20 @@ void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
   float b2 = eAB_.cross(d).dot(s) / denominator;
   float t = eAB_.cross(eAC_).dot(s) / denominator;
   if (t > MYEPSILON && b1 > -MYEPSILON && b2 > -MYEPSILON && b1 + b2 < 1 + MYEPSILON) {
-    rhor.hit_point = ray.GetPoint(t);
-    rhor.hit_normal = ((1 - b1 - b2) * A_.normal + b1 * B_.normal + b2 * C_.normal).normalized();
-    //rhor.hit_normal = eAB_.cross(eAC_).normalized();
-    rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
-    rhor.point_color = color_;
-    rhor.depth = t;
+    record.hit_point = ray.GetPoint(t);
+    record.hit_normal = ((1 - b1 - b2) * A_.normal + b1 * B_.normal + b2 * C_.normal).normalized();
+    //record.hit_normal = eAB_.cross(eAC_).normalized();
+    record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+    record.point_color = color_;
+    record.depth = t;
     return;
   }
 
-  rhor.hit_point = Vec3f::Zero();
-  rhor.hit_normal = Vec3f::Zero();
-  rhor.r_direction = Vec3f::Zero();
-  rhor.point_color = Vec3f::Zero();
-  rhor.depth = -1.f;
+  record.hit_point = Vec3f::Zero();
+  record.hit_normal = Vec3f::Zero();
+  record.r_direction = Vec3f::Zero();
+  record.point_color = Vec3f::Zero();
+  record.depth = -1.f;
 }
 const Vec3f &Triangle::GetBaryCenter() const {
   return bary_center_;
@@ -151,25 +150,25 @@ Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices,
 
   tree_ = std::make_shared<KDTree>(triangles_);
 }
-void Mesh::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+void Mesh::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   KDTree::TreeNode *node = tree_->GetRootNode();
-  HitTree(ray, node, rhor);
+  HitTree(ray, node, record);
 }
 void Mesh::HitTree(const Ray &ray, KDTree::TreeNode *node,
-  RayHitObjectRecord &rhor) {
+  RayHitObjectRecord &record) {
   if (RayHitAABB(ray, node->AA, node->BB)) {
     if (!node->face_ids.empty()) {
       RayHitObjectRecord rhorT;
       for (auto i = node->face_ids.begin(); i != node->face_ids.end(); ++i) {
         triangles_[*i]->RayIntersection(ray, rhorT);
         if (rhorT.depth > MYEPSILON &&
-          (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON)) {
-          rhor = rhorT;
+          (record.depth > rhorT.depth || record.depth < MYEPSILON)) {
+          record = rhorT;
         }
       }
     } else {
-      HitTree(ray, node->l_child, rhor);
-      HitTree(ray, node->r_child, rhor);
+      HitTree(ray, node->l_child, record);
+      HitTree(ray, node->r_child, record);
     }
   }
 }
@@ -194,12 +193,12 @@ Model::Model(const std::string &filepath, const Vec3f &color)
   meshes_.clear();
   ProcessNode(scene->mRootNode, scene);
 }
-void Model::RayIntersection(const Ray &Ray, RayHitObjectRecord &rhor) {
+void Model::RayIntersection(const Ray &Ray, RayHitObjectRecord &record) {
   RayHitObjectRecord rhorT;
   for (auto i = 0; i < meshes_.size(); ++i) {
     meshes_[i]->RayIntersection(Ray, rhorT);
-    if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON)) {
-      rhor = rhorT;
+    if (rhorT.depth > MYEPSILON && (record.depth > rhorT.depth || record.depth < MYEPSILON)) {
+      record = rhorT;
     }
   }
 }

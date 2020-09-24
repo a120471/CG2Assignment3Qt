@@ -33,7 +33,7 @@ void NumberWidget<Scalar>::SetValidator() {
     this->setValidator(new QIntValidator(this));
   } else if (std::is_same<Scalar, uint32_t>::value) {
     this->setValidator(new QIntValidator(
-      0, std::numeric_limits<uint32_t>::max(), this));
+      0, std::numeric_limits<int32_t>::max(), this));
   } else if (std::is_same<Scalar, float>::value) {
     this->setValidator(new QDoubleValidator(this));
   } else if (std::is_same<Scalar, double>::value) {

@@ -126,7 +126,7 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
   }
 }
 
-// void CubeMapFace::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+// void CubeMapFace::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   Vec3f sp = ray.sPoint;
 //   Vec3f d = ray.direction;
 
@@ -137,9 +137,9 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //   while (t > MYEPSILON) {
 //     Vec3f hit_point = ray.getPoint(t);
 //     for (int i = 0; i < 4; ++i) {
-//       Vec3f &e = Vec3f();
+//       Vec3f &e = Vec3f::Zero();
 //       Vec3f n;
-//       Vec3f &n_ = Vec3f();
+//       Vec3f &n_ = Vec3f::Zero();
 
 //       switch (i) {
 //       case 0:
@@ -162,21 +162,21 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //       n = this->normal.cross(e);
 
 //       if (n.dot(n_) < 0) {
-//         rhor.hit_point = Vec3f::Zero();
-//         rhor.hit_normal = Vec3f::Zero();
-//         rhor.r_direction = Vec3f::Zero();
-//         rhor.point_color = Vec3f::Zero();
-//         rhor.depth = -1;
+//         record.hit_point = Vec3f::Zero();
+//         record.hit_normal = Vec3f::Zero();
+//         record.r_direction = Vec3f::Zero();
+//         record.point_color = Vec3f::Zero();
+//         record.depth = -1;
 //         return;
 //       }
 //     }
 
-//     rhor.hit_point = ray.getPoint(t);
-//     rhor.hit_normal = this->normal;
-//     rhor.r_direction = ray.direction - 2 * ray.direction.dot(rhor.hit_normal) * rhor.hit_normal; // it's already normalized
+//     record.hit_point = ray.getPoint(t);
+//     record.hit_normal = this->normal;
+//     record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
 
-//     float wCoord = (rhor.hit_point - ulCorner).dot(dRight) / size * n;
-//     float hCoord = (rhor.hit_point - ulCorner).dot(dDown) / size * n;
+//     float wCoord = (record.hit_point - ulCorner).dot(dRight) / size * n;
+//     float hCoord = (record.hit_point - ulCorner).dot(dDown) / size * n;
 
 //     if ((int)wCoord < 0) wCoord = 0.0f;
 //     if ((int)wCoord >= n - 2) wCoord = (float)(n - 2);
@@ -193,16 +193,16 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //       data[(int)hCoord + 1][(int)wCoord] * ww2 * wh1 +
 //       data[(int)hCoord + 1][(int)wCoord + 1] * ww1 * wh1;
 
-//     rhor.point_color = color;
-//     rhor.depth = t;
+//     record.point_color = color;
+//     record.depth = t;
 //     return;
 //   }
 
-//   rhor.hit_point = Vec3f::Zero();
-//   rhor.hit_normal = Vec3f::Zero();
-//   rhor.r_direction = Vec3f::Zero();
-//   rhor.point_color = Vec3f::Zero();
-//   rhor.depth = -1;
+//   record.hit_point = Vec3f::Zero();
+//   record.hit_normal = Vec3f::Zero();
+//   record.r_direction = Vec3f::Zero();
+//   record.point_color = Vec3f::Zero();
+//   record.depth = -1;
 // }
 
 
@@ -317,7 +317,7 @@ void CubeMap::AppendToLightInfo(const Vec3f &s_point,
     f->AppendToLightInfo(s_point, infos);
   }
 }
-// void CubeMap::RayIntersection(const Ray &ray, RayHitObjectRecord &rhor) {
+// void CubeMap::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 //   RayHitObjectRecord rhorT;
 //   for (int i = 0; i < 5; ++i) {
 //     CubeMapFace *p;
@@ -328,8 +328,8 @@ void CubeMap::AppendToLightInfo(const Vec3f &s_point,
 //     else if (i == 4) p = this->backward;
 
 //     p->RayIntersection(ray, rhorT);
-//     if (rhorT.depth > MYEPSILON && (rhor.depth > rhorT.depth || rhor.depth < MYEPSILON))
-//       rhor = rhorT;
+//     if (rhorT.depth > MYEPSILON && (record.depth > rhorT.depth || record.depth < MYEPSILON))
+//       record = rhorT;
 //   }
 // }
 

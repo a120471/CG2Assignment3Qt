@@ -28,7 +28,7 @@ void RayTracingCamera::SetK(const Vec2u &resolution, float fov_h) {
   resolution_ = resolution;
 
   float focal = (resolution_(0) / 2.f) / tan(fov_h / 2.f);
-  K_ << focal, 0.f, resolution_(0) - 1.f - 0.5f,
+  K_ << focal, 0.f, resolution_(0) / 2.f - 0.5f,
         0.f, focal, resolution_(1) / 2.f - 0.5f,
         0.f, 0.f, 1.f;
 }
@@ -40,7 +40,8 @@ const Vec2u &RayTracingCamera::GetResolution() {
 // row and col start from 0
 void RayTracingCamera::GenerateRay(int row, int col, Ray &ray) {
 
-  Vec3f local_ray = K_.inverse() * Vec3f(col, row, 1.f);
+  Vec3f local_ray = K_.inverse() * Vec3f(col, resolution_(1) - 1 - row, 1.f);
+  local_ray(2) *= -1.f;
 
   ray.s_point = camera_frame_.col(3).head(3);
   ray.direction = (camera_frame_.block<3, 3>(0, 0) * local_ray).normalized();

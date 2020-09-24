@@ -1,3 +1,5 @@
+gcc 9.3.0
+
 #Ray tracing and path tracing (computer graphics)#
 
 To render an image using ray tracing, we need to define camera, geometry object and light source. Then we can render every pixel by tracing rays from camera.

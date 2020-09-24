@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QTextStream>
+#include <QDebug>
 #include "LightSource.h"
 #include "GeometryObject.h"
 #include "RayTracingCamera.h"
@@ -30,7 +31,7 @@ std::mutex mutex;
 
 void CreateLights(std::vector<std::shared_ptr<LightBase>> &lights) {
   lights.emplace_back(std::make_shared<PointLight>(
-    Vec3f(1.3f, 0.f, 1.f), Vec3f::Constant(0.7f));
+    Vec3f(1.3f, 0.f, 1.f), Vec3f::Constant(0.7f)));
   lights.emplace_back(std::make_shared<PointLight>(
     Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f) * 1.0f));
   lights.emplace_back(std::make_shared<CubeMap>(CUBE_MAP_PATH, 30.1f));
@@ -41,10 +42,12 @@ Vec3f QStringListToVec3f(const QStringList &list) {
 }
 
 Vec4f QStringListToVec4f(const QStringList &list) {
-  return Vec4f(list[0].toFloat(), list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
+  return Vec4f(list[0].toFloat(), list[1].toFloat(),
+    list[2].toFloat(), list[3].toFloat());
 }
 
-void ParseSceneLineData(std::vector<std::shared_ptr<GeometryObject>> &scene, const QString &line) {
+void ParseSceneLineData(std::vector<std::shared_ptr<GeometryObject>> &scene,
+  const QString &line) {
   QStringList level1 = line.split(';', Qt::SkipEmptyParts);
 
   if (!level1.empty()) {
@@ -161,7 +164,7 @@ void MainWindow::RenderScene() {
   std::vector<std::shared_ptr<GeometryObject>> scene;
   QFile scene_file(scene_file_text_->text());
   if (!scene_file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    printf("file %s not exists\n", scene_file_text_->text().toStdString().c_str());
+    qDebug() << QString("file %1 not exists").arg(scene_file_text_->text());
     return;
   }
   QTextStream in(&scene_file);
@@ -222,30 +225,31 @@ void MainWindow::RenderImage(const RenderParams &params,
 
   // calculate a factor to tune rgb value
   int nth_idx = (int)(pixel_num * NTHIDX) - 1;
-  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+  auto rgbs_copy = rgbs;
+  nth_element(rgbs_copy.begin(), rgbs_copy.begin() + nth_idx, rgbs_copy.end(),
     [](const Vec3f &a, const Vec3f &b) {
       return a(0) < b(0);
     });
-  float max_radiance = std::max(0.01f, rgbs[nth_idx](0));
-  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+  float max_radiance = std::max(0.01f, rgbs_copy[nth_idx](0));
+  nth_element(rgbs_copy.begin(), rgbs_copy.begin() + nth_idx, rgbs_copy.end(),
     [](const Vec3f &a, const Vec3f &b) {
       return a(1) < b(1);
     });
-  max_radiance = std::max(max_radiance, rgbs[nth_idx](1));
-  nth_element(rgbs.begin(), rgbs.begin() + nth_idx, rgbs.end(),
+  max_radiance = std::max(max_radiance, rgbs_copy[nth_idx](1));
+  nth_element(rgbs_copy.begin(), rgbs_copy.begin() + nth_idx, rgbs_copy.end(),
     [](const Vec3f &a, const Vec3f &b) {
       return a(2) < b(2);
     });
-  max_radiance = std::max(max_radiance, rgbs[nth_idx](2));
+  max_radiance = std::max(max_radiance, rgbs_copy[nth_idx](2));
   float scale = 255.0f / max_radiance;
 
   int i = 0;
   for (int row = 0; row < resolution(1); ++row) {
     for (int col = 0; col < resolution(0); ++col) {
       rgbs[i] *= scale;
-      int R = (int)std::min(rgbs[i][0], 255.f);
-      int G = (int)std::min(rgbs[i][1], 255.f);
-      int B = (int)std::min(rgbs[i][2], 255.f);
+      int R = (int)std::min(rgbs[i](0), 255.f);
+      int G = (int)std::min(rgbs[i](1), 255.f);
+      int B = (int)std::min(rgbs[i](2), 255.f);
       for (int rowI = 0; rowI < params.image_scale_ratio; ++rowI) {
         for (int colI = 0; colI < params.image_scale_ratio; ++colI) {
           q_image->setPixel(col * params.image_scale_ratio + colI,
@@ -276,15 +280,15 @@ void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
 
   // for each ray inside a pixel
   RayHitObjectRecord record;
-  rgbs[pixel_id] = Vec3f();
 
   // find the hit object and hit type
   int hitType = RayHitTest(ray, scene, lights, record);
   if (hitType == 1) {
-    rgbs[pixel_id] += calColorOnHitPoint(record, scene, lights, 1);
-  }
-  else if (hitType == 2) {
-    rgbs[pixel_id] += record.point_color;
+    rgbs[pixel_id] = calColorOnHitPoint(record, scene, lights, 1);
+  } else if (hitType == 2) {
+    rgbs[pixel_id] = record.point_color;
+  } else {
+    rgbs[pixel_id] = Vec3f::Zero();
   }
 }
 
@@ -343,8 +347,7 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
   if (hitType == 1) {
     Vec3f recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, lights, level + 1);
     reflectionColor = levelDegenerateRatio * std::max(record.hit_normal.dot(record.r_direction), 0.0f) * recursiveHitPointColor;
-  }
-  else if (hitType == 2) {
+  } else if (hitType == 2) {
     specular += specularStrength * reflectionHitRecord.point_color;
   }
 
@@ -370,7 +373,7 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
     diffuse *= 1.0f;
   }
 
-  Vec3f returnColor = Vec3f(0);
+  Vec3f returnColor = Vec3f::Zero();
   returnColor += diffuse / (float)infos.size() + specular;
   //if (1 == level)
   //  returnColor = Vec3f::Zero();

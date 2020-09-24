@@ -22,4 +22,5 @@ find_package(stb REQUIRED)
 file(GLOB SRC src/*.cpp)
 
 add_executable(ray_tracing_program ${SRC})
-target_link_libraries(ray_tracing_program PRIVATE Qt5::Widgets Eigen3::Eigen3 assimp::assimp TBB::TBB stb::stb)
+target_link_libraries(ray_tracing_program PRIVATE Qt5::Widgets
+  Eigen3::Eigen3 assimp::assimp TBB::TBB stb::stb)
