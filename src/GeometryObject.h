@@ -87,7 +87,7 @@ public:
 
 private:
   Vertex A_, B_, C_;
-  Vec3f eAB_, eAC_;
+  Vec3f edge1_, edge2_;
   Vec3f bary_center_;
 };
 

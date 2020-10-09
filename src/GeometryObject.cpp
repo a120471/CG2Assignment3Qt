@@ -4,6 +4,20 @@
 #include <Eigen/Geometry>
 #include "Utils.h"
 
+namespace {
+
+using namespace ray_tracing;
+
+void SetInvalidReyHitObjectRecord(RayHitObjectRecord &record) {
+  record.hit_point = Vec3f::Zero();
+  record.hit_normal = Vec3f::Zero();
+  record.r_direction = Vec3f::Zero();
+  record.point_color = Vec3f::Zero();
+  record.depth = -1.f;
+}
+
+}
+
 namespace ray_tracing {
 
 GeometryObject::GeometryObject(const std::string &type_name,
@@ -56,11 +70,7 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
     }
   }
 
-  record.hit_point = Vec3f::Zero();
-  record.hit_normal = Vec3f::Zero();
-  record.r_direction = Vec3f::Zero();
-  record.point_color = Vec3f::Zero();
-  record.depth = -1.f;
+  SetInvalidReyHitObjectRecord(record);
 }
 
 
@@ -88,11 +98,7 @@ void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
     return;
   }
 
-  record.hit_point = Vec3f::Zero();
-  record.hit_normal = Vec3f::Zero();
-  record.r_direction = Vec3f::Zero();
-  record.point_color = Vec3f::Zero();
-  record.depth = -1.f;
+  SetInvalidReyHitObjectRecord(record);
 }
 
 
@@ -106,33 +112,50 @@ Triangle::Triangle(const Vertex &A,
   BB_ = A_.position.cwiseMax(B_.position).cwiseMax(C_.position);
 
   bary_center_ = (A_.position + B_.position + C_.position) / 3.0f;
-  eAB_ = B_.position - A_.position;
-  eAC_ = C_.position - A_.position;
+  edge1_ = B_.position - A_.position;
+  edge2_ = C_.position - A_.position;
 }
+// Möller–Trumbore intersection algorithm
 void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  Vec3f s = ray.s_point - A_.position;
-  Vec3f d = ray.direction;
+  const Vec3f &ray_o = ray.s_point;
+  const Vec3f &ray_d = ray.direction;
 
-  float denominator = d.cross(eAC_).dot(eAB_);
+  Vec3f h = ray_d.cross(edge2_);
+  float a = edge1_.dot(h);
+  if (abs(a) < MYEPSILON) {
+    SetInvalidReyHitObjectRecord(record);
+    return;
+  }
 
-  float b1 = d.cross(eAC_).dot(s) / denominator;
-  float b2 = eAB_.cross(d).dot(s) / denominator;
-  float t = eAB_.cross(eAC_).dot(s) / denominator;
-  if (t > MYEPSILON && b1 > -MYEPSILON && b2 > -MYEPSILON && b1 + b2 < 1 + MYEPSILON) {
+  float f = 1.f / a;
+  Vec3f s = ray_o - A_.position;
+  float u = f * s.dot(h);
+  if (u < 0.f || u > 1.f) {
+    SetInvalidReyHitObjectRecord(record);
+    return;
+  }
+
+  Vec3f q = s.cross(edge1_);
+  float v = f * ray_d.dot(q);
+  if (v < 0.f || u + v > 1.f) {
+    SetInvalidReyHitObjectRecord(record);
+    return;
+  }
+
+  float t = f * edge2_.dot(q);
+  if (t > MYEPSILON) {
     record.hit_point = ray.GetPoint(t);
-    record.hit_normal = ((1 - b1 - b2) * A_.normal + b1 * B_.normal + b2 * C_.normal).normalized();
-    //record.hit_normal = eAB_.cross(eAC_).normalized();
+    record.hit_normal = ((1.f - u - v) * A_.normal +
+      u * B_.normal + v * C_.normal).normalized();
+    //record.hit_normal = edge1_.cross(edge2_).normalized();
     record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
     record.point_color = color_;
     record.depth = t;
     return;
+  } else {
+    SetInvalidReyHitObjectRecord(record);
+    return;
   }
-
-  record.hit_point = Vec3f::Zero();
-  record.hit_normal = Vec3f::Zero();
-  record.r_direction = Vec3f::Zero();
-  record.point_color = Vec3f::Zero();
-  record.depth = -1.f;
 }
 const Vec3f &Triangle::GetBaryCenter() const {
   return bary_center_;
