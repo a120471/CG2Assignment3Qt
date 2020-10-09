@@ -24,9 +24,8 @@ bool SortByZ(const std::shared_ptr<Triangle> &t1,
 
 namespace ray_tracing {
 
-KDTree::KDTree(const std::vector<std::shared_ptr<Triangle>> &faces)
-  : faces_(faces) {
-  BuildKDTree(0, faces_.size(), 0, root_node_);
+KDTree::KDTree(const std::vector<std::shared_ptr<Triangle>> &faces) {
+  BuildKDTree(0, faces.size(), 0, root_node_);
 }
 
 KDTree::~KDTree() {
@@ -37,7 +36,8 @@ KDTree::TreeNode *KDTree::GetRootNode() {
   return root_node_;
 }
 
-void KDTree::BuildKDTree(int head, int tail, int level, TreeNode *&node) {
+void KDTree::BuildKDTree(std::vector<Triangle> &faces,
+  int head, int tail, int level, TreeNode *&node) {
   node = new TreeNode();
 
   if (tail - head <= 4) {
@@ -45,8 +45,8 @@ void KDTree::BuildKDTree(int head, int tail, int level, TreeNode *&node) {
       node->face_ids.emplace_back(i);
     }
     // compute the bounding box
-    faces_[head]->GetBoundingBox(node->AA, node->BB);
-    for (auto i = faces_.begin() + head + 1; i < faces_.begin() + tail; ++i) {
+    faces[head]->GetBoundingBox(node->AA, node->BB);
+    for (auto i = faces.begin() + head + 1; i < faces.begin() + tail; ++i) {
       Vec3f AT, BT;
       (*i)->GetBoundingBox(AT, BT);
       MergeBoundingBox(node->AA, node->BB, node->AA, node->BB, AT, BT);
@@ -57,13 +57,13 @@ void KDTree::BuildKDTree(int head, int tail, int level, TreeNode *&node) {
 
   switch (level % 3) {
   case 0:
-    std::sort(faces_.begin() + head, faces_.begin() + tail, SortByX);
+    std::sort(faces.begin() + head, faces.begin() + tail, SortByX);
     break;
   case 1:
-    std::sort(faces_.begin() + head, faces_.begin() + tail, SortByY);
+    std::sort(faces.begin() + head, faces.begin() + tail, SortByY);
     break;
   case 2:
-    std::sort(faces_.begin() + head, faces_.begin() + tail, SortByZ);
+    std::sort(faces.begin() + head, faces.begin() + tail, SortByZ);
     break;
   }
 

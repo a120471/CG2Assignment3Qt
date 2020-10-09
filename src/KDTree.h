@@ -19,17 +19,17 @@ public:
     std::vector<int> face_ids;
   };
 
-  KDTree(const std::vector<std::shared_ptr<Triangle>> &faces);
+  KDTree(std::vector<Triangle> &faces);
   ~KDTree();
 
   TreeNode *GetRootNode();
 
 private:
-  void BuildKDTree(int head, int tail, int level, TreeNode *&node);
+  void BuildKDTree(std::vector<Triangle> &faces,
+    int head, int tail, int level, TreeNode *&node);
   void DeleteKDTree(TreeNode *&node);
 
   TreeNode *root_node_{nullptr};
-  std::vector<std::shared_ptr<Triangle>> faces_;
 };
 
 }
