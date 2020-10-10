@@ -40,17 +40,14 @@ void inline MySwap(T &t1, T &t2) {
   t2 = tmp;
 };
 
-static void MergeBoundingBox(Vec3f &A, Vec3f &B,
-  Vec3f A1, Vec3f B1, Vec3f A2, Vec3f B2) {
-  A = A1.cwiseMin(A2);
-  B = B1.cwiseMax(B2);
-}
-
 // Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-static bool RayHitAABB(const Ray &ray, const Vec3f &A, const Vec3f &B) {
+static bool RayHitAABB(const Ray &ray, const AABB &aabb) {
   float abs_dx = abs(ray.direction(0));
   float abs_dy = abs(ray.direction(1));
   float abs_dz = abs(ray.direction(2));
+
+  const auto &A = aabb.min();
+  const auto &B = aabb.max();
 
   Vec3f A_RS = A - ray.s_point;
   Vec3f B_RS = B - ray.s_point;

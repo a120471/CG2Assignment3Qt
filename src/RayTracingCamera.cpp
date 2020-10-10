@@ -1,5 +1,4 @@
 #include "RayTracingCamera.h"
-#include <Eigen/Geometry>
 
 namespace ray_tracing {
 

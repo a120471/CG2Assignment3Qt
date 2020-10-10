@@ -1,7 +1,6 @@
 #include "GeometryObject.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
-#include <Eigen/Geometry>
 #include "Utils.h"
 
 namespace {
@@ -25,9 +24,8 @@ GeometryObject::GeometryObject(const std::string &type_name,
   : type_name_(type_name)
   , color_(color) {
 }
-void GeometryObject::GetBoundingBox(Vec3f &AA, Vec3f &BB) {
-  AA = AA_;
-  BB = BB_;
+const AABB &GeometryObject::GetBoundingBox() const {
+  return aabb_;
 }
 
 
@@ -35,8 +33,8 @@ Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   : GeometryObject("sphere", color)
   , center_(center)
   , radius_(radius) {
-  AA_ = center_ - Vec3f::Constant(radius_);
-  BB_ = center_ + Vec3f::Constant(radius_);
+  aabb_ = AABB(center_ - Vec3f::Constant(radius_),
+    center_ + Vec3f::Constant(radius_));
 }
 void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   Vec3f sc = ray.s_point - center_;
@@ -77,8 +75,8 @@ void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   : GeometryObject("plane", color)
   , ABCD_(ABCD) {
-  AA_ = Vec3f::Constant(-MYINFINITE);
-  BB_ = Vec3f::Constant(MYINFINITE);
+  aabb_ = AABB(Vec3f::Constant(-MYINFINITE),
+    Vec3f::Constant(MYINFINITE));
 }
 void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
   Vec3f sp = ray.s_point;
@@ -108,8 +106,7 @@ Triangle::Triangle(const Vertex &A,
   , A_(A)
   , B_(B)
   , C_(C) {
-  AA_ = A_.position.cwiseMin(B_.position).cwiseMin(C_.position);
-  BB_ = A_.position.cwiseMax(B_.position).cwiseMax(C_.position);
+  aabb_.extend(A_.position).extend(B_.position).extend(C_.position);
 
   bary_center_ = (A_.position + B_.position + C_.position) / 3.0f;
   edge1_ = B_.position - A_.position;
@@ -179,11 +176,11 @@ void Mesh::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
 }
 void Mesh::HitTree(const Ray &ray, KDTree::TreeNode *node,
   RayHitObjectRecord &record) {
-  if (RayHitAABB(ray, node->AA, node->BB)) {
+  if (RayHitAABB(ray, node->aabb)) {
     if (!node->face_ids.empty()) {
       RayHitObjectRecord rhorT;
-      for (auto i = node->face_ids.begin(); i != node->face_ids.end(); ++i) {
-        triangles_[*i]->RayIntersection(ray, rhorT);
+      for (auto id : node->face_ids) {
+        triangles_[id]->RayIntersection(ray, rhorT);
         if (rhorT.depth > MYEPSILON &&
           (record.depth > rhorT.depth || record.depth < MYEPSILON)) {
           record = rhorT;
@@ -225,15 +222,20 @@ void Model::RayIntersection(const Ray &Ray, RayHitObjectRecord &record) {
     }
   }
 }
-void Model::ProcessNode(aiNode *node, const aiScene *scene) {
-  // Process all the node's meshes (if any)
-  for (auto i = 0; i < node->mNumMeshes; ++i) {
-    aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-    meshes_.emplace_back(CreateMesh(mesh, scene));
-  }
-  // Then do the same for each of its children
-  for (auto i = 0; i < node->mNumChildren; ++i) {
-    ProcessNode(node->mChildren[i], scene);
+void Model::ProcessNode(aiNode *root_node, const aiScene *scene) {
+  std::stack<aiNode*> nodes;
+  nodes.emplace(root_node);
+  while (!nodes.empty()) {
+    auto node = nodes.top();
+    nodes.pop();
+    // Process all the node's meshes (if any)
+    for (auto i = 0; i < node->mNumMeshes; ++i) {
+      aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+      meshes_.emplace_back(CreateMesh(mesh, scene));
+    }
+    for (auto i = 0; i < node->mNumChildren; ++i) {
+      nodes.emplace(node->mChildren[i]);
+    }
   }
 }
 std::shared_ptr<Mesh> Model::CreateMesh(aiMesh *mesh, const aiScene *scene) {

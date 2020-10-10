@@ -41,11 +41,11 @@ public:
   virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
 
   // use bounding box to accerlerate the ray hit test
-  virtual void GetBoundingBox(Vec3f &AA, Vec3f &BB);
+  virtual const AABB &GetBoundingBox() const;
 
   std::string type_name_;
   Vec3f color_;
-  Vec3f AA_, BB_; // bounding box
+  Vec3f aabb_;
 };
 
 class Sphere : public GeometryObject {

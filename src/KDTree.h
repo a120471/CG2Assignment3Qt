@@ -11,9 +11,7 @@ class Triangle;
 class KDTree {
 public:
   struct TreeNode {
-    // bounding box
-    Vec3f AA;
-    Vec3f BB;
+    AABB aabb;
 
     TreeNode *l_child, *r_child;
     std::vector<int> face_ids;

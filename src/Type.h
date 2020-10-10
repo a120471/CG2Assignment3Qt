@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 namespace ray_tracing {
 
@@ -12,6 +13,7 @@ using Vec3d = Eigen::Vector3d;
 using Vec4f = Eigen::Vector4f;
 using Mat3f = Eigen::Matrix3f;
 using Mat4f = Eigen::Matrix4f;
+using AABB = Eigen::AlignedBox<float, 3>;
 
 struct RenderParams {
   Vec2u resolution;

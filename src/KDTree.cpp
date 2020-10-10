@@ -7,17 +7,17 @@ namespace {
 
 using namespace ray_tracing;
 
-bool SortByX(const std::shared_ptr<Triangle> &t1,
-  const std::shared_ptr<Triangle> &t2) {
-  return t1->GetBaryCenter()(0) < t2->GetBaryCenter()(0);
+bool SortByX(const Triangle &t1,
+  const Triangle &t2) {
+  return t1.GetBaryCenter()(0) < t2.GetBaryCenter()(0);
 }
-bool SortByY(const std::shared_ptr<Triangle> &t1,
-  const std::shared_ptr<Triangle> &t2) {
-  return t1->GetBaryCenter()(1) < t2->GetBaryCenter()(1);
+bool SortByY(const Triangle &t1,
+  const Triangle &t2) {
+  return t1.GetBaryCenter()(1) < t2.GetBaryCenter()(1);
 }
-bool SortByZ(const std::shared_ptr<Triangle> &t1,
-  const std::shared_ptr<Triangle> &t2) {
-  return t1->GetBaryCenter()(2) < t2->GetBaryCenter()(2);
+bool SortByZ(const Triangle &t1,
+  const Triangle &t2) {
+  return t1.GetBaryCenter()(2) < t2.GetBaryCenter()(2);
 }
 
 }
@@ -45,35 +45,29 @@ void KDTree::BuildKDTree(std::vector<Triangle> &faces,
       node->face_ids.emplace_back(i);
     }
     // compute the bounding box
-    faces[head]->GetBoundingBox(node->AA, node->BB);
-    for (auto i = faces.begin() + head + 1; i < faces.begin() + tail; ++i) {
-      Vec3f AT, BT;
-      (*i)->GetBoundingBox(AT, BT);
-      MergeBoundingBox(node->AA, node->BB, node->AA, node->BB, AT, BT);
+    for (auto i = head; i < tail; ++i) {
+      node->aabb.extend(faces[i].GetBoundingBox());
+    }
+  } else {
+    switch (level % 3) {
+    case 0:
+      std::sort(faces.begin() + head, faces.begin() + tail, SortByX);
+      break;
+    case 1:
+      std::sort(faces.begin() + head, faces.begin() + tail, SortByY);
+      break;
+    case 2:
+      std::sort(faces.begin() + head, faces.begin() + tail, SortByZ);
+      break;
     }
 
-    return;
+    int middle = (head + tail) / 2;
+    BuildKDTree(head, middle, level + 1, node->l_child);
+    BuildKDTree(middle, tail, level + 1, node->r_child);
+
+    node->aabb.extend(node->l_child->aabb).extend(
+      node->r_child->aabb);
   }
-
-  switch (level % 3) {
-  case 0:
-    std::sort(faces.begin() + head, faces.begin() + tail, SortByX);
-    break;
-  case 1:
-    std::sort(faces.begin() + head, faces.begin() + tail, SortByY);
-    break;
-  case 2:
-    std::sort(faces.begin() + head, faces.begin() + tail, SortByZ);
-    break;
-  }
-
-  int middle = (head + tail) / 2;
-  BuildKDTree(head, middle, level + 1, node->l_child);
-  BuildKDTree(middle, tail, level + 1, node->r_child);
-
-  MergeBoundingBox(node->AA, node->BB,
-    node->l_child->AA, node->l_child->BB,
-    node->r_child->AA, node->r_child->BB);
 }
 
 void KDTree::DeleteKDTree(TreeNode *&node) {
