@@ -17,10 +17,11 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(assimp REQUIRED)
 find_package(TBB REQUIRED)
+find_package(fmt REQUIRED)
 find_package(stb REQUIRED)
 
 file(GLOB SRC src/*.cpp)
 
 add_executable(ray_tracing_program ${SRC})
 target_link_libraries(ray_tracing_program PRIVATE Qt5::Widgets
-  Eigen3::Eigen3 assimp::assimp TBB::TBB stb::stb)
+  Eigen3::Eigen3 assimp::assimp TBB::TBB fmt::fmt stb::stb)

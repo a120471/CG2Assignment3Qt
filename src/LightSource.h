@@ -7,7 +7,7 @@
 namespace ray_tracing {
 
 class Ray;
-struct RayHitObjectRecord;
+struct RayHitRecord;
 
 struct LightInfoToPoint {
   LightInfoToPoint(const Vec3f &c, const Vec3f &dir, float d)
@@ -21,7 +21,7 @@ struct LightInfoToPoint {
   float distance;
 };
 
-//// ?we normalize light color in unit voxel space, may be too big?!
+// todo, ?we normalize light color in unit voxel space, may be too big?!
 
 class LightBase {
 public:
@@ -30,10 +30,10 @@ public:
   virtual void AppendToLightInfo(const Vec3f &s_point,
     std::vector<LightInfoToPoint> &infos) const = 0;
 
-  // virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
+  // virtual RayHitRecord RayIntersection(const Ray &ray) = 0;
 };
 
-//// ?a voxel point light, will a voxel be toooooo big?
+//// todo, ?a voxel point light, will a voxel be toooooo big?
 class PointLight : public LightBase {
 public:
   PointLight(const Vec3f &pos, const Vec3f &color);
@@ -41,7 +41,7 @@ public:
   void AppendToLightInfo(const Vec3f &s_point,
     std::vector<LightInfoToPoint> &infos) const override;
 
-  // void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  // RayHitRecord RayIntersection(const Ray &ray) override;
 
 private:
   Vec3f pos_;
@@ -56,7 +56,7 @@ public:
   void AppendToLightInfo(const Vec3f &s_point,
     std::vector<LightInfoToPoint> &infos) const override;
 
-  // void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  // RayHitRecord RayIntersection(const Ray &ray) override;
 
 private:
   void GenerateCandidate(const Vec2f &size,
@@ -74,7 +74,7 @@ public:
   void AppendToLightInfo(const Vec3f &s_point,
     std::vector<LightInfoToPoint> &infos) const override;
 
-  // void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+  // RayHitRecord RayIntersection(const Ray &ray) override;
 
 private:
   std::vector<std::vector<Vec3f>> data_;
@@ -103,7 +103,7 @@ public:
   void AppendToLightInfo(const Vec3f &s_point,
     std::vector<LightInfoToPoint> &infos) const override;
 
-  // void RayIntersection(const Ray &ray, RayHitObjectRecord&) override;
+  // RayHitRecord RayIntersection(const Ray &ray) override;
 
 private:
   std::shared_ptr<CubeMapFace> CreateFace(int face_type,

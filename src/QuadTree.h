@@ -21,7 +21,7 @@ class QuadTree {
 public:
   QuadTree(const std::vector<std::vector<Vec3f>> &data, float size);
 
-  const std::vector<NodeInfo> &GetNodeInfos();
+  const std::vector<NodeInfo> &GetNodeInfos() const;
 
 private:
   void BuildTree(int sr, int sc, int er, int ec);

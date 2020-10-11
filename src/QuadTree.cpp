@@ -24,7 +24,7 @@ QuadTree::QuadTree(const std::vector<std::vector<Vec3f>> &data, float size) {
   BuildTree(0, 0, n - 1, n - 1);
 }
 
-const std::vector<NodeInfo> &QuadTree::GetNodeInfos() {
+const std::vector<NodeInfo> &QuadTree::GetNodeInfos() const {
   return node_infos_;
 }
 
@@ -35,7 +35,7 @@ void QuadTree::BuildTree(int sr, int sc, int er, int ec) {
   if ((value.array() < COLOR_INTENSITY_THRES).all()) {
     Vec2f center((sc + ec) * pixel_size_ / 2.f,
       (sr + er) * pixel_size_ / 2.f);
-    Vec2i reso(ec - sc + 1, er - sr + 1);
+    Vec2u reso(ec - sc + 1u, er - sr + 1u);
 
     node_infos_.emplace_back(center,
       reso.cast<float>() * pixel_size_, value);

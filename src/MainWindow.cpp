@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include <memory>
 #include <mutex>
+#include <chrono>
 #include <tbb/parallel_for.h>
 #include <QBoxLayout>
 #include <QFormLayout>
@@ -23,9 +24,9 @@ const std::vector<float> LOOKAT{0.f, 0.f, 0.f};
 const QString SCENE_FILE_PATH = QString("/home/dushuai/GitProject/CG2Assignment3Qt/resources/scene.txt");
 const std::string CUBE_MAP_PATH = "/home/dushuai/GitProject/CG2Assignment3Qt/resources/cubemap.hdr";
 
-namespace {
-
 using namespace ray_tracing;
+
+namespace {
 
 std::mutex mutex;
 
@@ -33,7 +34,7 @@ void CreateLights(std::vector<std::shared_ptr<LightBase>> &lights) {
   lights.emplace_back(std::make_shared<PointLight>(
     Vec3f(1.3f, 0.f, 1.f), Vec3f::Constant(0.7f)));
   lights.emplace_back(std::make_shared<PointLight>(
-    Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f) * 1.0f));
+    Vec3f(-1.1f, 1.f, 0.5f), Vec3f(0.4f, 0.6f, 0.5f)));
   lights.emplace_back(std::make_shared<CubeMap>(CUBE_MAP_PATH, 30.1f));
 }
 
@@ -48,35 +49,22 @@ Vec4f QStringListToVec4f(const QStringList &list) {
 
 void ParseSceneLineData(std::vector<std::shared_ptr<GeometryObject>> &scene,
   const QString &line) {
-  QStringList level1 = line.split(';', Qt::SkipEmptyParts);
+  QStringList parts = line.split(';', Qt::SkipEmptyParts);
 
-  if (!level1.empty()) {
-    QStringList level2;
-    QString geometry_type = level1[0].toLower();
+  if (!parts.empty()) {
+    QString geometry_type = parts[0].toLower();
     if (geometry_type == "sphere") {
-      level2 = level1[1].split(',');
-      Vec3f center = QStringListToVec3f(level2);
-
-      float radius = level1[2].toFloat();
-
-      level2 = level1[3].split(',');
-      Vec3f color = QStringListToVec3f(level2);
-
+      Vec3f center = QStringListToVec3f(parts[1].split(','));
+      float radius = parts[2].toFloat();
+      Vec3f color = QStringListToVec3f(parts[3].split(','));
       scene.emplace_back(std::make_shared<Sphere>(center, radius, color));
     } else if (geometry_type == "plane") {
-      level2 = level1[1].split(',');
-      Vec4f ABCD = QStringListToVec4f(level2);
-
-      level2 = level1[2].split(',');
-      Vec3f color = QStringListToVec3f(level2);
-
+      Vec4f ABCD = QStringListToVec4f(parts[1].split(','));
+      Vec3f color = QStringListToVec3f(parts[2].split(','));
       scene.emplace_back(std::make_shared<Plane>(ABCD, color));
     } else if (geometry_type == "model") {
-      std::string filepath = level1[1].toStdString();
-
-      level2 = level1[2].split(',');
-      Vec3f color = QStringListToVec3f(level2);
-
+      std::string filepath = parts[1].toStdString();
+      Vec3f color = QStringListToVec3f(parts[2].split(','));
       scene.emplace_back(std::make_shared<Model>(filepath, color));
     }
   }
@@ -185,7 +173,7 @@ void MainWindow::RenderScene() {
     cam_pos, lookat, Vec3f(0.f, 1.f, 0.f));
   camera->SetK(params.resolution, 90.f);
 
-  // render image
+  // Render image
   render_button_->setEnabled(false);
   render_button_->repaint();
   RenderImage(params, scene, camera, lights);
@@ -196,7 +184,7 @@ void MainWindow::RenderImage(const RenderParams &params,
     const std::vector<std::shared_ptr<GeometryObject>> &scene,
     const std::shared_ptr<RayTracingCamera> &camera,
     const std::vector<std::shared_ptr<LightBase>> &lights) {
-  const clock_t s_time = clock();
+  auto s_time = std::chrono::system_clock::now();
 
   const auto &resolution = camera->GetResolution();
 
@@ -214,16 +202,10 @@ void MainWindow::RenderImage(const RenderParams &params,
     [&](tbb::blocked_range<int> r) {
     for (int i = r.begin(); i < r.end(); ++i) {
       RenderPixels(camera, i, resolution(0), rgbs, scene, lights);
-
-      // mutex.lock();
-      // rendered_image_->setPixmap(QPixmap::fromImage(q_image));
-      // rendered_image_->repaint();
-      // QCoreApplication::processEvents();
-      // mutex.unlock();
     }
   });
 
-  // calculate a factor to tune rgb value
+  // Calculate factor to tune rgb value
   int nth_idx = (int)(pixel_num * NTHIDX) - 1;
   auto rgbs_copy = rgbs;
   nth_element(rgbs_copy.begin(), rgbs_copy.begin() + nth_idx, rgbs_copy.end(),
@@ -261,9 +243,10 @@ void MainWindow::RenderImage(const RenderParams &params,
     }
   }
 
-  // display the image
-  float delta_time = float(clock() - s_time) / CLOCKS_PER_SEC;
-  rendered_image_->setPixmap(QPixmap::fromImage(*(q_image.get())));
+  // Display the image
+  auto e_time = std::chrono::system_clock::now();
+  auto delta_time = std::chrono::duration<float>(e_time - s_time).count();
+  rendered_image_->setPixmap(QPixmap::fromImage(*q_image));
   render_time_->setText(QString("Time: %1s").arg(delta_time));
 }
 
@@ -275,13 +258,11 @@ void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
 
   uint32_t row = pixel_id / resolution_w;
   uint32_t col = pixel_id % resolution_w;
-  Ray ray;
-  camera->GenerateRay(row, col, ray);
+  Ray ray = camera->GenerateRay(row, col);
 
-  // for each ray inside a pixel
-  RayHitObjectRecord record;
+  RayHitRecord record;
 
-  // find the hit object and hit type
+  // Find the hit object and hit type
   int hitType = RayHitTest(ray, scene, lights, record);
   if (hitType == 1) {
     rgbs[pixel_id] = calColorOnHitPoint(record, scene, lights, 1);
@@ -295,15 +276,15 @@ void MainWindow::RenderPixels(const std::shared_ptr<RayTracingCamera> &camera,
 int MainWindow::RayHitTest(const Ray &ray,
   const std::vector<std::shared_ptr<GeometryObject>> &scene,
   const std::vector<std::shared_ptr<LightBase>> &lights,
-  RayHitObjectRecord &record, float lightDis) {
+  RayHitRecord &record, float lightDis) {
 
   record.depth = -1;
   int hitType = 0;
-  RayHitObjectRecord tmp_record;
+  RayHitRecord tmp_record;
 
   for (auto object : scene) {
-    object->RayIntersection(ray, tmp_record);
-    if (tmp_record.depth - lightDis > -MYEPSILON) { // the object is further than the light source
+    tmp_record = object->RayIntersection(ray);
+    if (tmp_record.depth - lightDis > -MYEPSILON) { // Object is further than the light source
       continue;
     }
     if (tmp_record.depth > MYEPSILON && (record.depth > tmp_record.depth || record.depth < MYEPSILON)) {
@@ -330,10 +311,10 @@ int MainWindow::RayHitTest(const Ray &ray,
 float diffuseStrength = 0.8f;
 float specularStrength = 1.0f - diffuseStrength;
 float levelDegenerateRatio = 0.5f;
-Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
+Vec3f MainWindow::calColorOnHitPoint(RayHitRecord &record,
   const std::vector<std::shared_ptr<GeometryObject>> &scene,
   const std::vector<std::shared_ptr<LightBase>> &lights, int level) {
-  // level starts from 1
+  // Level starts from 1
   if (level > 3)
     return Vec3f::Zero();
 
@@ -342,7 +323,7 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
 
   Vec3f reflectionColor = Vec3f::Zero();
   Ray reflectionRay(record.hit_point, record.r_direction);
-  RayHitObjectRecord reflectionHitRecord;
+  RayHitRecord reflectionHitRecord;
   int hitType = RayHitTest(reflectionRay, scene, lights, reflectionHitRecord);
   if (hitType == 1) {
     Vec3f recursiveHitPointColor = calColorOnHitPoint(reflectionHitRecord, scene, lights, level + 1);
@@ -351,8 +332,8 @@ Vec3f MainWindow::calColorOnHitPoint(RayHitObjectRecord &record,
     specular += specularStrength * reflectionHitRecord.point_color;
   }
 
-  RayHitObjectRecord lightHitRecord;
-  // for each light source
+  RayHitRecord lightHitRecord;
+  // For each light source
   std::vector<LightInfoToPoint> infos;
   for (auto light : lights) {
     infos.clear();

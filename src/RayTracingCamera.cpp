@@ -32,18 +32,19 @@ void RayTracingCamera::SetK(const Vec2u &resolution, float fov_h) {
         0.f, 0.f, 1.f;
 }
 
-const Vec2u &RayTracingCamera::GetResolution() {
+const Vec2u &RayTracingCamera::GetResolution() const {
   return resolution_;
 }
 
-// row and col start from 0
-void RayTracingCamera::GenerateRay(int row, int col, Ray &ray) {
+Ray RayTracingCamera::GenerateRay(int row, int col) const {
 
   Vec3f local_ray = K_.inverse() * Vec3f(col, resolution_(1) - 1 - row, 1.f);
   local_ray(2) *= -1.f;
 
+  Ray ray;
   ray.s_point = camera_frame_.col(3).head(3);
   ray.direction = (camera_frame_.block<3, 3>(0, 0) * local_ray).normalized();
+  return ray;
 }
 
 }

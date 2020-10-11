@@ -16,7 +16,8 @@ namespace ray_tracing {
 class GeometryObject;
 class RayTracingCamera;
 class LightBase;
-struct RayHitObjectRecord;
+struct RayHitRecord;
+class Ray;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -34,8 +35,8 @@ private:
   int RayHitTest(const Ray &ray,
     const std::vector<std::shared_ptr<GeometryObject>> &scene,
     const std::vector<std::shared_ptr<LightBase>> &lights,
-    RayHitObjectRecord &record, float lightDis = MYINFINITE);
-  Vec3f calColorOnHitPoint(RayHitObjectRecord &record,
+    RayHitRecord &record, float lightDis = MYINFINITE);
+  Vec3f calColorOnHitPoint(RayHitRecord &record,
     const std::vector<std::shared_ptr<GeometryObject>> &scene,
     const std::vector<std::shared_ptr<LightBase>> &lights, int level);
   void RenderImage(const RenderParams &params,

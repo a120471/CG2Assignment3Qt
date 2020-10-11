@@ -20,12 +20,8 @@ void PointLight::AppendToLightInfo(const Vec3f &s_point,
     (pos_ - s_point).norm());
 }
 
-// void PointLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-//   record.hit_point = Vec3f::Zero();
-//   record.hit_normal = Vec3f::Zero();
-//   record.r_direction = Vec3f::Zero();
-//   record.point_color = Vec3f::Zero();
-//   record.depth = -1;
+// RayHitRecord PointLight::RayIntersection(const Ray &ray) {
+//   return RayHitRecord();
 // }
 
 
@@ -35,7 +31,7 @@ AreaLight::AreaLight(const Vec3f &pos, const Vec3f &sum_color,
   Vec3f sample_num = sum_color / UNIT_SAMPLE_COLOR;
   uint32_t num = (uint32_t)sample_num.maxCoeff();
 
-  // sample num points on the area
+  // Sample num points on the area
   std::vector<Vec2f> points;
   GenerateCandidate(size, num, points);
 
@@ -53,14 +49,8 @@ void AreaLight::AppendToLightInfo(const Vec3f &s_point,
   }
 }
 
-// void AreaLight::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-//   // todo
-//   return;
-//   // record.hit_point = Vec3f::Zero();
-//   // record.hit_normal = Vec3f::Zero();
-//   // record.r_direction = Vec3f::Zero();
-//   // record.point_color = Vec3f::Zero();
-//   // record.depth = -1;
+// RayHitRecord PointLight::RayIntersection(const Ray &ray) {
+//   return RayHitRecord();
 // }
 
 // Mitchell’s best-candidate algorithm
@@ -115,6 +105,7 @@ CubeMapFace::CubeMapFace(std::vector<std::vector<Vec3f>> &&data,
       info.sum_color, info.size, right_dir_, down_dir_));
   }
 
+  // todo, ?
   // normal_ = down_dir_.cross(right_dir_).normalized();
   // D = -ulCorner.dot(normal);
 }
@@ -126,7 +117,8 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
   }
 }
 
-// void CubeMapFace::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
+// RayHitRecord CubeMapFace::RayIntersection(const Ray &ray) {
+//   RayHitRecord record;
 //   Vec3f sp = ray.sPoint;
 //   Vec3f d = ray.direction;
 
@@ -162,18 +154,15 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //       n = this->normal.cross(e);
 
 //       if (n.dot(n_) < 0) {
-//         record.hit_point = Vec3f::Zero();
-//         record.hit_normal = Vec3f::Zero();
-//         record.r_direction = Vec3f::Zero();
-//         record.point_color = Vec3f::Zero();
-//         record.depth = -1;
+//         return record;
 //         return;
 //       }
 //     }
 
 //     record.hit_point = ray.getPoint(t);
 //     record.hit_normal = this->normal;
-//     record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+//     record.r_direction = ray.direction -
+//       2 * ray.direction.dot(record.hit_normal) * record.hit_normal;
 
 //     float wCoord = (record.hit_point - ulCorner).dot(dRight) / size * n;
 //     float hCoord = (record.hit_point - ulCorner).dot(dDown) / size * n;
@@ -198,11 +187,7 @@ void CubeMapFace::AppendToLightInfo(const Vec3f &s_point,
 //     return;
 //   }
 
-//   record.hit_point = Vec3f::Zero();
-//   record.hit_normal = Vec3f::Zero();
-//   record.r_direction = Vec3f::Zero();
-//   record.point_color = Vec3f::Zero();
-//   record.depth = -1;
+//   return record;
 // }
 
 
@@ -245,7 +230,7 @@ std::shared_ptr<CubeMapFace> CubeMap::CreateFace(
   bool row_inverse, bool col_inverse, float size,
   float *image_data) {
 
-  // calculate light's info on each face type
+  // Calculate light's info on each face type
   Vec3f center, right_dir, down_dir;
   float half_size = size / 2.0f;
   switch (face_type) {
@@ -317,8 +302,8 @@ void CubeMap::AppendToLightInfo(const Vec3f &s_point,
     f->AppendToLightInfo(s_point, infos);
   }
 }
-// void CubeMap::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-//   RayHitObjectRecord rhorT;
+// RayHitRecord CubeMap::RayIntersection(const Ray &ray) {
+//   RayHitRecord record;
 //   for (int i = 0; i < 5; ++i) {
 //     CubeMapFace *p;
 //     if (i == 0) p = this->top;
@@ -327,9 +312,10 @@ void CubeMap::AppendToLightInfo(const Vec3f &s_point,
 //     else if (i == 3) p = this->forward;
 //     else if (i == 4) p = this->backward;
 
-//     p->RayIntersection(ray, rhorT);
-//     if (rhorT.depth > MYEPSILON && (record.depth > rhorT.depth || record.depth < MYEPSILON))
-//       record = rhorT;
+//     auto tmp = p->RayIntersection(ray);
+//     if (tmp.depth > MYEPSILON &&
+//       (record.depth > tmp.depth || record.depth < 0.f))
+//       record = tmp;
 //   }
 // }
 

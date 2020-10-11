@@ -2,16 +2,19 @@
 #pragma once
 
 #include <string>
-#include <assimp/scene.h>
-#include "KDTree.h"
+#include "Kdtree.h"
+
+class aiScene;
+class aiMesh;
+class aiNode;
 
 namespace ray_tracing {
 
 class Ray;
 
-// saved data of each hit point and reflection direction
-struct RayHitObjectRecord {
-  RayHitObjectRecord& operator=(const RayHitObjectRecord& record) {
+// Ray hit info
+struct RayHitRecord {
+  RayHitRecord& operator=(const RayHitRecord& record) {
     if (this == &record) {
       return *this;
     }
@@ -25,10 +28,10 @@ struct RayHitObjectRecord {
   }
 
   float depth{-1.f};
-  Vec3f hit_point;
-  Vec3f hit_normal;
-  Vec3f r_direction;
-  Vec3f point_color;
+  Vec3f hit_point{Vec3f::Zero()};
+  Vec3f hit_normal{Vec3f::Zero()};
+  Vec3f r_direction{Vec3f::Zero()};
+  Vec3f point_color{Vec3f::Zero()};
 };
 
 
@@ -38,22 +41,21 @@ public:
   GeometryObject(const std::string &type_name, const Vec3f &color);
   virtual ~GeometryObject() = default;
 
-  virtual void RayIntersection(const Ray &ray, RayHitObjectRecord &record) = 0;
+  virtual RayHitRecord RayIntersection(const Ray &ray) const = 0;
 
-  // use bounding box to accerlerate the ray hit test
+  // Use bounding box to accerlerate the ray hit test
   virtual const AABB &GetBoundingBox() const;
 
   std::string type_name_;
   Vec3f color_;
-  Vec3f aabb_;
+  AABB aabb_;
 };
 
 class Sphere : public GeometryObject {
 public:
-  Sphere(const Vec3f &center, float radius,
-    const Vec3f &color = Vec3f::Ones());
+  Sphere(const Vec3f &center, float radius, const Vec3f &color);
 
-  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  RayHitRecord RayIntersection(const Ray &ray) const override;
 
 private:
   Vec3f center_;
@@ -62,60 +64,53 @@ private:
 
 class Plane : public GeometryObject {
 public:
-  Plane(const Vec4f &ABCD, const Vec3f &color = Vec3f::Ones());
+  Plane(const Vec4f &ABCD, const Vec3f &color);
 
-  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  RayHitRecord RayIntersection(const Ray &ray) const override;
 
 private:
-  // Ax + By + Cz + D = 0;
+  // Ax + By + Cz + D = 0; ABC's norm should be 1.f
   Vec4f ABCD_;
 };
 
 class Triangle : public GeometryObject {
 public:
-  struct Vertex {
-    Vec3f position;
-    Vec3f normal;
-  };
+  Triangle(const Vec3f &A, const Vec3f &B,
+    const Vec3f &C, const Vec3f &color);
 
-  Triangle(const Vertex &A, const Vertex &B, const Vertex &C,
-    Vec3f color = Vec3f::Ones());
-
-  void RayIntersection(const Ray &ray, RayHitObjectRecord &record) override;
+  RayHitRecord RayIntersection(const Ray &ray) const override;
 
   const Vec3f &GetBaryCenter() const;
 
 private:
-  Vertex A_, B_, C_;
+  Vec3f A_, B_, C_;
   Vec3f edge1_, edge2_;
+  Vec3f normal_;
   Vec3f bary_center_;
 };
 
 class Mesh : public GeometryObject {
 public:
-  Mesh(const std::vector<Triangle::Vertex> &vertices,
-    const std::vector<int> &indices,
-    const Vec3f &color = Vec3f::Ones());
+  Mesh(const std::vector<Vec3f> &vertices,
+    const std::vector<uint32_t> &indices,
+    const Vec3f &color);
 
-  void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
-
-  void HitTree(const Ray &ray, KDTree::TreeNode *node, RayHitObjectRecord &record);
+  RayHitRecord RayIntersection(const Ray &Ray) const override;
 
 private:
-  std::vector<std::shared_ptr<Triangle>> triangles_;
-  std::shared_ptr<KDTree> tree_;
+  std::shared_ptr<Kdtree> tree_;
+  std::vector<Triangle> triangles_;
 };
 
 class Model : public GeometryObject {
 public:
-  Model(const std::string &filepath,
-    const Vec3f &color = Vec3f::Ones());
+  Model(const std::string &filepath, const Vec3f &color);
 
-  void RayIntersection(const Ray &Ray, RayHitObjectRecord &record) override;
+  RayHitRecord RayIntersection(const Ray &Ray) const override;
 
 private:
   void ProcessNode(aiNode *node, const aiScene *scene);
-  std::shared_ptr<Mesh> CreateMesh(aiMesh *mesh, const aiScene *scene);
+  std::shared_ptr<Mesh> CreateMesh(aiMesh *mesh);
 
   std::vector<std::shared_ptr<Mesh>> meshes_;
 };

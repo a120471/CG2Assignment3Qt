@@ -4,6 +4,7 @@ eigen/3.3.7
 assimp/5.0.1
 tbb/2020.2
 stb/20200203
+fmt/7.0.3
 
 [generators]
 cmake_find_package

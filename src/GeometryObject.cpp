@@ -1,19 +1,14 @@
 #include "GeometryObject.h"
+#include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+#include <fmt/format.h>
+#include "RayTracingCamera.h"
 #include "Utils.h"
 
 namespace {
 
-using namespace ray_tracing;
-
-void SetInvalidReyHitObjectRecord(RayHitObjectRecord &record) {
-  record.hit_point = Vec3f::Zero();
-  record.hit_normal = Vec3f::Zero();
-  record.r_direction = Vec3f::Zero();
-  record.point_color = Vec3f::Zero();
-  record.depth = -1.f;
-}
+const float EPSILON = 1e-4f; // todo, is there precision problem?
 
 }
 
@@ -33,194 +28,200 @@ Sphere::Sphere(const Vec3f &center, float radius, const Vec3f &color)
   : GeometryObject("sphere", color)
   , center_(center)
   , radius_(radius) {
-  aabb_ = AABB(center_ - Vec3f::Constant(radius_),
-    center_ + Vec3f::Constant(radius_));
+  aabb_ = AABB(center_.array() - radius_, center_.array() + radius_);
 }
-void Sphere::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
+RayHitRecord Sphere::RayIntersection(const Ray &ray) const {
+  RayHitRecord record;
+
   Vec3f sc = ray.s_point - center_;
-  Vec3f d = ray.direction;
+  const auto &d = ray.direction;
 
-  // (s_point + d * t - center) ^ 2 == radius ^ 2
+  // (sc + d * t - center) ^ 2 == radius ^ 2
   // At^2 + Bt + C = 0, solve t
-  float A = d.squaredNorm();
-  float B = 2 * d.dot(sc);
-  float C = sc.squaredNorm() - radius_*radius_;
+  float A2 = d.squaredNorm() * 2.f;
+  float B = 2.f * d.dot(sc);
+  float C = sc.squaredNorm() - radius_ * radius_;
 
-  float det = B * B - 4 * A * C;
-  if (det > MYEPSILON) {
-    float t1 = (-B - sqrt(det)) / (2 * A);
-    float t2 = (-B + sqrt(det)) / (2 * A);
+  float det = B * B - 2.f * A2 * C;
+  if (det > 0.f) {
+    float t = 0.f;
+    float sqrt_det = sqrt(det);
+    if (sqrt_det + B < 0.f) {
+      t = (-B - sqrt_det) / A2;
+    } else if (sqrt_det - B > 0.f) {
+      t = (-B + sqrt_det) / A2;
+    }
 
-    if (t1 > MYEPSILON) {
-      record.hit_point = ray.GetPoint(t1);
+    if (t > 0.f) {
+      record.depth = t;
+      record.hit_point = ray.GetPoint(t);
       record.hit_normal = (record.hit_point - center_).normalized();
-      record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
+      record.r_direction = ray.direction -
+        2.f * ray.direction.dot(record.hit_normal) * record.hit_normal;
       record.point_color = color_;
-      record.depth = t1;
-      return;
-    } else if (t2 > MYEPSILON) {
-      record.hit_point = ray.GetPoint(t2);
-      record.hit_normal = (record.hit_point - center_).normalized();
-      record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
-      record.point_color = color_;
-      record.depth = t2;
-      return;
     }
   }
 
-  SetInvalidReyHitObjectRecord(record);
+  return record;
 }
 
 
 Plane::Plane(const Vec4f &ABCD, const Vec3f &color)
   : GeometryObject("plane", color)
-  , ABCD_(ABCD) {
-  aabb_ = AABB(Vec3f::Constant(-MYINFINITE),
-    Vec3f::Constant(MYINFINITE));
+  , ABCD_(ABCD / ABCD.head<3>().norm()) {
+  aabb_ = AABB(Vec3f::Constant(-MYINFINITE), Vec3f::Constant(MYINFINITE));
 }
-void Plane::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  Vec3f sp = ray.s_point;
-  Vec3f d = ray.direction;
+RayHitRecord Plane::RayIntersection(const Ray &ray) const {
+  RayHitRecord record;
+
+  const auto &sp = ray.s_point;
+  const auto &d = ray.direction;
 
   float denominator = ABCD_.head<3>().dot(d);
   float numerator = -ABCD_(3) - ABCD_.head<3>().dot(sp);
 
   float t = numerator / denominator;
-  if (t > MYEPSILON) {
-    auto normal = ABCD_.head<3>().normalized();
-    record.hit_point = ray.GetPoint(t);
-    record.hit_normal = normal;
-    record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
-    record.point_color = color_;
+  if (t > EPSILON) {
     record.depth = t;
-    return;
+    record.hit_point = ray.GetPoint(t);
+    record.hit_normal = ABCD_.head<3>();
+    record.r_direction = ray.direction -
+      2.f * ray.direction.dot(record.hit_normal) * record.hit_normal;
+    record.point_color = color_;
   }
 
-  SetInvalidReyHitObjectRecord(record);
+  return record;
 }
 
 
-Triangle::Triangle(const Vertex &A,
-  const Vertex &B, const Vertex &C, Vec3f color)
+Triangle::Triangle(const Vec3f &A, const Vec3f &B,
+  const Vec3f &C, const Vec3f &color)
   : GeometryObject("triangle", color)
   , A_(A)
   , B_(B)
   , C_(C) {
-  aabb_.extend(A_.position).extend(B_.position).extend(C_.position);
+  aabb_.extend(A_).extend(B_).extend(C_);
 
-  bary_center_ = (A_.position + B_.position + C_.position) / 3.0f;
-  edge1_ = B_.position - A_.position;
-  edge2_ = C_.position - A_.position;
+  bary_center_ = (A_ + B_ + C_) / 3.f;
+  edge1_ = B_ - A_;
+  edge2_ = C_ - A_;
+  normal_ = edge1_.cross(edge2_).normalized();
 }
 // Möller–Trumbore intersection algorithm
-void Triangle::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  const Vec3f &ray_o = ray.s_point;
-  const Vec3f &ray_d = ray.direction;
+RayHitRecord Triangle::RayIntersection(const Ray &ray) const {
+  RayHitRecord record;
+
+  const auto &ray_o = ray.s_point;
+  const auto &ray_d = ray.direction;
+
+  if (ray_d.dot(normal_) >= 0.f) {
+    return record;
+  }
 
   Vec3f h = ray_d.cross(edge2_);
   float a = edge1_.dot(h);
-  if (abs(a) < MYEPSILON) {
-    SetInvalidReyHitObjectRecord(record);
-    return;
+  if (abs(a) < EPSILON) {
+    return record;
   }
 
   float f = 1.f / a;
-  Vec3f s = ray_o - A_.position;
+  Vec3f s = ray_o - A_;
   float u = f * s.dot(h);
   if (u < 0.f || u > 1.f) {
-    SetInvalidReyHitObjectRecord(record);
-    return;
+    return record;
   }
 
   Vec3f q = s.cross(edge1_);
   float v = f * ray_d.dot(q);
   if (v < 0.f || u + v > 1.f) {
-    SetInvalidReyHitObjectRecord(record);
-    return;
+    return record;
   }
 
   float t = f * edge2_.dot(q);
-  if (t > MYEPSILON) {
-    record.hit_point = ray.GetPoint(t);
-    record.hit_normal = ((1.f - u - v) * A_.normal +
-      u * B_.normal + v * C_.normal).normalized();
-    //record.hit_normal = edge1_.cross(edge2_).normalized();
-    record.r_direction = ray.direction - 2 * ray.direction.dot(record.hit_normal) * record.hit_normal; // it's already normalized
-    record.point_color = color_;
+  if (t > EPSILON) {
     record.depth = t;
-    return;
-  } else {
-    SetInvalidReyHitObjectRecord(record);
-    return;
+    record.hit_point = ray.GetPoint(t);
+    record.hit_normal = normal_;
+    record.r_direction = ray.direction -
+      2.f * ray.direction.dot(record.hit_normal) * record.hit_normal;
+    record.point_color = color_;
   }
+
+  return record;
 }
 const Vec3f &Triangle::GetBaryCenter() const {
   return bary_center_;
 }
 
 
-Mesh::Mesh(const std::vector<Triangle::Vertex> &vertices,
-  const std::vector<int> &faces, const Vec3f &color)
+Mesh::Mesh(const std::vector<Vec3f> &vertices,
+  const std::vector<uint32_t> &faces_ids, const Vec3f &color)
   : GeometryObject("mesh", color) {
-  triangles_.clear();
-  for (auto i = 0; i < faces.size(); i += 3) {
-    triangles_.emplace_back(std::make_shared<Triangle>(vertices[faces[i]],
-      vertices[faces[i + 1]], vertices[faces[i + 2]], color));
+  for (auto i = 0; i < faces_ids.size(); i += 3u) {
+    triangles_.emplace_back(vertices[faces_ids[i]],
+      vertices[faces_ids[i + 1]], vertices[faces_ids[i + 2]], color);
   }
 
-  tree_ = std::make_shared<KDTree>(triangles_);
+  tree_ = std::make_shared<Kdtree>(triangles_);
 }
-void Mesh::RayIntersection(const Ray &ray, RayHitObjectRecord &record) {
-  KDTree::TreeNode *node = tree_->GetRootNode();
-  HitTree(ray, node, record);
-}
-void Mesh::HitTree(const Ray &ray, KDTree::TreeNode *node,
-  RayHitObjectRecord &record) {
-  if (RayHitAABB(ray, node->aabb)) {
-    if (!node->face_ids.empty()) {
-      RayHitObjectRecord rhorT;
-      for (auto id : node->face_ids) {
-        triangles_[id]->RayIntersection(ray, rhorT);
-        if (rhorT.depth > MYEPSILON &&
-          (record.depth > rhorT.depth || record.depth < MYEPSILON)) {
-          record = rhorT;
+RayHitRecord Mesh::RayIntersection(const Ray &ray) const {
+  RayHitRecord record;
+
+  std::stack<std::shared_ptr<TreeNode>> nodes;
+  nodes.emplace(tree_->GetRootNode());
+  while (!nodes.empty()) {
+    auto node = nodes.top();
+    nodes.pop();
+
+    if (node->RayHitAABB(ray)) {
+      if (node->IsLeafNode()) {
+        const auto &triangle_ids = node->GetTriangleIds();
+        for (auto id : triangle_ids) {
+          RayHitRecord tmp = triangles_[id].RayIntersection(ray);
+          if (tmp.depth > EPSILON &&
+            (record.depth > tmp.depth || record.depth < 0.f)) {
+            record = std::move(tmp);
+          }
         }
+      } else {
+        node->EmplaceNonEmptyChilds(nodes);
       }
-    } else {
-      HitTree(ray, node->l_child, record);
-      HitTree(ray, node->r_child, record);
     }
   }
+
+  return record;
 }
 
 
 Model::Model(const std::string &filepath, const Vec3f &color)
   : GeometryObject("model", color) {
-  srand(time(0));
+  srand(time(0)); // todo, necessary?
 
   Assimp::Importer importer;
   const aiScene *scene = importer.ReadFile(filepath,
-    aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
-    aiProcess_FlipUVs | aiProcess_GenNormals |
-    aiProcess_SplitLargeMeshes | aiProcess_OptimizeMeshes);
+    aiProcess_Triangulate |
+    aiProcess_JoinIdenticalVertices |
+    aiProcess_SplitLargeMeshes |
+    aiProcess_OptimizeMeshes);
 
   if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE ||
     !scene->mRootNode) {
-    //std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
-    return;
+    throw std::runtime_error(
+      fmt::format("ERROR::ASSIMP::{}", importer.GetErrorString()));
   }
 
-  meshes_.clear();
   ProcessNode(scene->mRootNode, scene);
 }
-void Model::RayIntersection(const Ray &Ray, RayHitObjectRecord &record) {
-  RayHitObjectRecord rhorT;
+RayHitRecord Model::RayIntersection(const Ray &Ray) const {
+  RayHitRecord record;
   for (auto i = 0; i < meshes_.size(); ++i) {
-    meshes_[i]->RayIntersection(Ray, rhorT);
-    if (rhorT.depth > MYEPSILON && (record.depth > rhorT.depth || record.depth < MYEPSILON)) {
-      record = rhorT;
+    RayHitRecord tmp = meshes_[i]->RayIntersection(Ray);
+    if (tmp.depth > EPSILON &&
+      (record.depth > tmp.depth || record.depth < 0.f)) {
+      record = std::move(tmp);
     }
   }
+  return record;
 }
 void Model::ProcessNode(aiNode *root_node, const aiScene *scene) {
   std::stack<aiNode*> nodes;
@@ -231,45 +232,33 @@ void Model::ProcessNode(aiNode *root_node, const aiScene *scene) {
     // Process all the node's meshes (if any)
     for (auto i = 0; i < node->mNumMeshes; ++i) {
       aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-      meshes_.emplace_back(CreateMesh(mesh, scene));
+      meshes_.emplace_back(CreateMesh(mesh));
     }
     for (auto i = 0; i < node->mNumChildren; ++i) {
       nodes.emplace(node->mChildren[i]);
     }
   }
 }
-std::shared_ptr<Mesh> Model::CreateMesh(aiMesh *mesh, const aiScene *scene) {
-  std::vector<Triangle::Vertex> vertices;
-  std::vector<int> faces;
-
-  vertices.resize(mesh->mNumVertices);
+std::shared_ptr<Mesh> Model::CreateMesh(aiMesh *mesh) {
+  std::vector<Vec3f> vertices(mesh->mNumVertices);
   for (auto i = 0; i < mesh->mNumVertices; ++i) {
-    Triangle::Vertex vertex;
-
-    vertex.position << mesh->mVertices[i].x,
+    vertices[i] << mesh->mVertices[i].x,
       mesh->mVertices[i].y,
       mesh->mVertices[i].z;
-
-    vertex.normal << mesh->mNormals[i].x,
-      mesh->mNormals[i].y,
-      mesh->mNormals[i].z;
-
-    vertices[i] = vertex;
   }
-  // Process faces
-  faces.resize(3 * mesh->mNumFaces);
+
+  std::vector<uint32_t> faces_ids(3u * mesh->mNumFaces);
   for (auto i = 0, i1 = 0; i < mesh->mNumFaces; ++i) {
-    aiFace face = mesh->mFaces[i];
+    const aiFace &face = mesh->mFaces[i];
+    assert(face.nNumIndices == 3u);
     // Retrieve all indices of the face and store them in the indices vector
     for (auto j = 0; j < face.mNumIndices; ++j) {
-      faces[i1++] = face.mIndices[j];
+      faces_ids[i1++] = face.mIndices[j];
     }
   }
 
-  return std::make_shared<Mesh>(vertices, faces,
-    Vec3f(static_cast<float>(rand()) / RAND_MAX,
-      static_cast<float>(rand()) / RAND_MAX,
-      static_cast<float>(rand()) / RAND_MAX));
+  return std::make_shared<Mesh>(vertices, faces_ids,
+    (Vec3f::Random() + Vec3f::Ones()) / 2.f);
 }
 
 }
